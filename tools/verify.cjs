@@ -20,7 +20,8 @@ const { chromium } = require('playwright');
   ok('隔珠在27/54/81/108', JSON.stringify(st.spacers) === '[27,54,81,108]');
   ok('串繩連續貫穿、珠心同圓', st.axisErr < 1e-6 && st.strings === 1);
   ok('相鄰珠不重疊', st.minGap > 0, st.minGap.toFixed(3));
-  ok('佛頭珠在第108顆上方、飾穗在佛頭珠尾端', st.guruAbove && st.tasselAbove);
+  ok('第四隔珠兼作佛頭珠（較大）、三通塔頭在其正上方', st.guruAbove && st.headIsSpacer108);
+  ok('飾穗自塔頭垂下、位於珠外緣下方', st.tasselHangs);
   const d = await p.evaluate(() => {
     const D = KM.D, by = g => D.terms.filter(t => t.group === g).length;
     const slots = D.terms.map(t => t.slot), secs = D.chapters.reduce((a, c) => a + c.sections.length, 0), items = D.chapters.reduce((a, c) => a + c.sections.reduce((x, s) => x + (s.items || []).length, 0), 0);

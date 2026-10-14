@@ -184,7 +184,7 @@
         "<p>點部件文字或念珠部件，可看導師引文中的對應譬喻；按「依四區查看名相」，念珠旁會改為標示見、修、行、果四區。上一珠／下一珠只在已配置名相的珠位間移動。</p>" +
         "<h3>念珠部件與譬喻 " + tag("quote") + '</h3><ul class="parts">' + PART_KEYS.map(function (k) { var p = D.parts[k]; return '<li><button class="prow" data-go="part:' + k + '"><b>' + esc(p.title) + "</b><span>" + esc(p.text) + "</span></button></li>"; }).join("") + "</ul>" +
         '<h3>見修行果四區 ' + tag("nav") + '</h3><div class="chips">' + D.zones.map(function (zn) { return chip("zone:" + zn.idx, esc(zn.name) + " 區 <small>" + zn.first + "–" + zn.last + "</small>", "zone-" + zn.id); }).join("") + "</div>" +
-        '<div class="notice">環上 108 顆＝104 顆普通數珠＋4 顆隔珠（編號 27、54、81、108）；佛頭珠另計，與第四隔珠是不同部件。「見修行果」是本網站的導覽分類，不是引文原意；引文原本說「以風瑜伽為隔珠」。目前 76 個名相各占一個主珠位，為初始可調整配置，其餘 28 顆待配置；顏色較淺的珠子為待配置珠位。</div>';
+        '<div class="notice">環上 108 顆＝104 顆普通數珠＋4 顆隔珠（編號 27、54、81、108）；第四隔珠（第 108 顆）較大，兼作佛頭珠，其上加三通塔頭並懸飾穗。「見修行果」是本網站的導覽分類，不是引文原意；引文原本說「以風瑜伽為隔珠」。目前 76 個名相各占一個主珠位，為初始可調整配置，其餘 28 顆待配置；顏色較淺的珠子為待配置珠位。</div>';
     } else if (!sel && mode === "book") {
       h = '<p class="crumb">原書導讀 ・ 總覽</p><h2>原書導讀</h2><p class="guide">點選念珠上的章名或任一章，可分層查看節、目與頁碼。</p>' +
         "<p>全書四輯十七章，一章對應一顆數珠，不分見修行果。上一章／下一章只在 17 個章入口間移動；章內的節以「前一批／後一批」換頁。</p>" +
@@ -219,7 +219,7 @@
       h = '<p class="crumb">以數珠為喻 ・ 念珠部件</p><h2>' + esc(pt.title) + ' <small class="cnt">' + esc(pt.count) + "</small></h2><h3>譬喻 " + tag("quote") + '</h3><div class="box big">' + esc(pt.text) + "</div>";
       if (sel.id === "bead") h += '<p>環上共 108 顆：104 顆普通數珠＋4 顆隔珠。每 26 顆普通數珠之後接 1 顆隔珠。</p><div class="chips">' + D.zones.map(function (zn) { return chip("zone:" + zn.idx, esc(zn.name) + " 區 " + zn.first + "–" + zn.last); }).join("") + "</div>";
       if (sel.id === "spacer") h += '<div class="notice">四顆隔珠在環上第 27、54、81、108 顆。本站另以四隔珠標示「見、修、行、果」四區，這是導覽安排，不是引文原意。</div><div class="chips">' + D.zones.map(function (zn) { return chip("spacer:" + zn.idx, zn.spacerName + "・" + esc(zn.spacerTitle)); }).join("") + "</div>";
-      if (sel.id === "head") h += '<div class="notice">佛頭珠位於第四隔珠（環上第 108 顆）上方，是另計的 1 顆，不可與第四隔珠合併。</div>';
+      if (sel.id === "head") h += '<div class="notice">本站以第四隔珠（環上第 108 顆，較其他隔珠大）兼作佛頭珠，上方加三通塔頭，飾穗由塔頭垂下。</div><div class="chips">' + chip("spacer:3", "查看第四隔珠") + "</div>";
       if (sel.id === "tassel") h += '<div class="notice">飾穗繫於佛頭珠尾端，為佛頭珠所懸。</div>';
       if (sel.id === "string") h += '<div class="notice">串繩連續貫穿環上 108 顆珠子。</div>';
       h += '<p class="pend">此為引文中的譬喻；進一步解說待補。</p>';

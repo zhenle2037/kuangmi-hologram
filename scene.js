@@ -40,8 +40,9 @@
     try {
       renderer = new T.WebGLRenderer({ antialias: true, alpha: true });
     } catch (e) { return false; }
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
-    renderer.shadowMap.enabled = true; renderer.shadowMap.type = T.PCFShadowMap;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.toneMapping = T.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.8; // 柔和高光，避免過曝
+    renderer.shadowMap.enabled = true; renderer.shadowMap.type = T.PCFShadowMap; renderer.physicallyCorrectLights = false;
     host.appendChild(renderer.domElement);
 
     scene = new T.Scene();
@@ -51,16 +52,16 @@
     controls.minDistance = 8; controls.maxDistance = 140; controls.minPolarAngle = 0.3; controls.maxPolarAngle = 1.3;
     controls.rotateSpeed = 0.6;
 
-    scene.add(new T.HemisphereLight(0xfffaf0, 0xd9cbb5, 0.45));
-    var dl = new T.DirectionalLight(0xffffff, 0.75); dl.position.set(-14, 60, 26); dl.castShadow = true;
+    scene.add(new T.HemisphereLight(0xfff8ee, 0xd8c8b0, 0.42));
+    var dl = new T.DirectionalLight(0xfffaf2, 0.55); dl.position.set(-14, 60, 26); dl.castShadow = true;
     dl.shadow.mapSize.set(2048, 2048); dl.shadow.radius = 9; dl.shadow.bias = -0.0005;
     var sc = dl.shadow.camera; sc.left = sc.bottom = -45; sc.right = sc.top = 45; sc.near = 1; sc.far = 140; scene.add(dl);
-    var fl = new T.DirectionalLight(0xfff1dc, 0.35); fl.position.set(30, 10, 60); scene.add(fl);
+    var fl = new T.DirectionalLight(0xf3f0ea, 0.22); fl.position.set(30, 10, 60); scene.add(fl);
 
     buildGalaxy(); buildBase(); buildMala(); buildLabels();
     resize();
     camera.position.copy(overviewPos()); controls.target.set(0, 0, 0); controls.update();
-    malaGroup.rotation.y = Math.PI; // 初始：第 108 顆（及佛頭珠）在後方，從前方看佛頭珠位於其上方
+    malaGroup.rotation.y = Math.PI; // 初始：第 108 顆（兼作佛頭珠）在後方
     applyTargets(true);
 
     var el = renderer.domElement;
@@ -85,11 +86,11 @@
   /* ---------- 材質：星月菩提子、紅瑪瑙（程式產生貼圖，不需外部圖檔） ---------- */
   function rng(seed) { return function () { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; }; }
   function bodhiTextures(seed) { // 等距長方投影：v=0/1 為穿孔兩極（朝向相鄰珠）
-    var w = 512, h = 256, r = rng(seed);
-    var c = document.createElement("canvas"), b = document.createElement("canvas"); c.width = b.width = w; c.height = b.height = h;
-    var g = c.getContext("2d"), gb = b.getContext("2d");
+    var w = 512, h = 256, r = rng(seed), K = 2; // 以 2 倍解析度繪製（1024×512）
+    var c = document.createElement("canvas"), b = document.createElement("canvas"); c.width = b.width = w * K; c.height = b.height = h * K;
+    var g = c.getContext("2d"), gb = b.getContext("2d"); g.scale(K, K); gb.scale(K, K);
     var grd = g.createLinearGradient(0, 0, 0, h);
-    grd.addColorStop(0, "#c8b59a"); grd.addColorStop(0.1, "#e8dcc6"); grd.addColorStop(0.5, "#f3eadb"); grd.addColorStop(0.9, "#e8dcc6"); grd.addColorStop(1, "#c8b59a");
+    grd.addColorStop(0, "#cdb898"); grd.addColorStop(0.1, "#eee3cf"); grd.addColorStop(0.5, "#f8f2e6"); grd.addColorStop(0.9, "#eee3cf"); grd.addColorStop(1, "#cdb898");
     g.fillStyle = grd; g.fillRect(0, 0, w, h);
     gb.fillStyle = "#808080"; gb.fillRect(0, 0, w, h);
     var i, x, y, rr, a;
@@ -101,7 +102,7 @@
     // 月：兩極穿孔周圍的凹陷環
     [0, h].forEach(function (py) {
       var mg = g.createLinearGradient(0, py, 0, py === 0 ? 34 : h - 34);
-      mg.addColorStop(0, "rgba(110,80,45,.55)"); mg.addColorStop(1, "rgba(110,80,45,0)"); g.fillStyle = mg; g.fillRect(0, py === 0 ? 0 : h - 34, w, 34);
+      mg.addColorStop(0, "rgba(110,85,55,.45)"); mg.addColorStop(1, "rgba(110,80,45,0)"); g.fillStyle = mg; g.fillRect(0, py === 0 ? 0 : h - 34, w, 34);
     });
     // 星：深褐色小凹點，越靠兩極橫向拉長以抵銷投影
     var N = 230 + Math.floor(r() * 60);
@@ -112,24 +113,24 @@
       [x, x - w, x + w].forEach(function (xx) {
         if (xx < -sx * 2 || xx > w + sx * 2) return;
         var rg = g.createRadialGradient(xx, y, 0, xx, y, sx);
-        rg.addColorStop(0, "rgba(" + dark + "," + Math.floor(dark * 0.7) + "," + Math.floor(dark * 0.45) + "," + al + ")");
-        rg.addColorStop(0.6, "rgba(" + (dark + 40) + "," + Math.floor(dark * 0.8) + ",50," + al * 0.5 + ")"); rg.addColorStop(1, "rgba(120,90,50,0)");
+        rg.addColorStop(0, "rgba(" + dark + "," + Math.floor(dark * 0.72) + "," + Math.floor(dark * 0.5) + "," + al + ")");
+        rg.addColorStop(0.6, "rgba(" + (dark + 35) + "," + Math.floor((dark + 35) * 0.76) + "," + Math.floor((dark + 35) * 0.55) + "," + al * 0.5 + ")"); rg.addColorStop(1, "rgba(120,90,50,0)");
         g.save(); g.translate(xx, y); g.scale(sx / sz, 1); g.translate(-xx, -y); g.fillStyle = rg; g.beginPath(); g.arc(xx, y, sz * 1.15, 0, TAU); g.fill(); g.restore();
         gb.save(); gb.translate(xx, y); gb.scale(sx / sz, 1); gb.translate(-xx, -y); gb.fillStyle = "rgba(0,0,0,.75)"; gb.beginPath(); gb.arc(xx, y, sz * 0.9, 0, TAU); gb.fill(); gb.restore();
       });
     }
     var t1 = new T.CanvasTexture(c), t2 = new T.CanvasTexture(b);
-    t1.anisotropy = t2.anisotropy = 4;
+    t1.anisotropy = t2.anisotropy = 8;
     return { map: t1, bump: t2 };
   }
   function agateTexture() {
-    var w = 256, h = 128, r = rng(77), c = document.createElement("canvas"); c.width = w; c.height = h;
-    var g = c.getContext("2d"); g.fillStyle = "#9e1a14"; g.fillRect(0, 0, w, h);
-    for (var i = 0; i < 26; i++) { // 瑪瑙的層狀色帶
-      g.strokeStyle = "rgba(" + (r() < 0.5 ? "205,60,40" : "70,4,4") + "," + (0.05 + r() * 0.12) + ")"; g.lineWidth = 2 + r() * 10;
-      g.beginPath(); var y0 = r() * h; g.moveTo(0, y0); for (var x = 0; x <= w; x += 16) g.lineTo(x, y0 + Math.sin(x / 40 + i) * 6 + (r() - 0.5) * 4); g.stroke();
+    var w = 512, h = 256, r = rng(77), c = document.createElement("canvas"); c.width = w; c.height = h;
+    var g = c.getContext("2d"); g.fillStyle = "#3c0307"; g.fillRect(0, 0, w, h);
+    for (var i = 0; i < 34; i++) { // 瑪瑙的層狀色帶（深紅中帶較透亮的紅）
+      g.strokeStyle = "rgba(" + (r() < 0.55 ? "120,8,16" : "18,0,2") + "," + (0.08 + r() * 0.16) + ")"; g.lineWidth = 3 + r() * 16;
+      g.beginPath(); var y0 = r() * h; g.moveTo(0, y0); for (var x = 0; x <= w; x += 16) g.lineTo(x, y0 + Math.sin(x / 60 + i) * 9 + (r() - 0.5) * 5); g.stroke();
     }
-    var t = new T.CanvasTexture(c); t.anisotropy = 4; return t;
+    var t = new T.CanvasTexture(c); t.anisotropy = 8; return t;
   }
   function buildEnv() { // 柔光棚環境貼圖：讓菩提子與瑪瑙有自然反光
     var es = new T.Scene(), geo = new T.SphereGeometry(50, 32, 16), cols = [], p = geo.attributes.position, cc = new T.Color();
@@ -141,76 +142,89 @@
     return tex;
   }
 
+  var ANG = [], RAD = [], RB = 0.62, RS = 0.76, RG = 1.0, tasselPivot = null, towerTip = null;
   function buildMala() {
     malaGroup = new T.Group(); scene.add(malaGroup);
     scene.environment = buildEnv();
-    var RB = 0.62, RS = 0.74;
-    var geoR = new T.SphereGeometry(RB, 40, 28), geoRW = geoR, geoM = new T.SphereGeometry(RS, 40, 28), geoMW = geoM;
+    // 珠位角度：依各珠大小緊密排列（第 108 顆隔珠兼作佛頭珠，較大），第 108 顆在角度 0
+    var n, sum = 0;
+    for (n = 1; n <= 108; n++) { RAD[n] = n === 108 ? RG : KM.BEADS[n].spacer ? RS : RB; sum += 2 * RAD[n]; }
+    var gap = (TAU * R - sum) / 108; ANG[108] = 0;
+    for (n = 1; n <= 107; n++) ANG[n] = ANG[n - 1 || 108] + (RAD[n - 1 || 108] + gap + RAD[n]) / R;
+    var geoR = new T.SphereGeometry(RB, 48, 32), geoM = new T.SphereGeometry(RS, 48, 32), geoG = new T.SphereGeometry(RG, 64, 44);
     var BT = [11, 23, 37, 59, 71, 97].map(bodhiTextures), agate = agateTexture(), YA = new T.Vector3(0, 1, 0), r = rng(2024);
-    function bodhiMat(k) { var tx = BT[k % BT.length]; return new T.MeshPhysicalMaterial({ map: tx.map, bumpMap: tx.bump, bumpScale: 0.012, color: 0xffffff, emissive: 0xffd9a0, emissiveIntensity: 0, roughness: 0.48, metalness: 0, clearcoat: 0.45, clearcoatRoughness: 0.35, envMapIntensity: 0.55, transparent: true, opacity: 1 }); }
-    function agateMat() { return new T.MeshPhysicalMaterial({ map: agate, color: 0xe0b8b4, emissive: 0x3a0503, emissiveIntensity: 0, roughness: 0.1, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.03, envMapIntensity: 1.35, reflectivity: 0.6, transparent: true, opacity: 1 }); }
-    for (var n = 1; n <= 108; n++) {
-      var b = KM.BEADS[n], th = TAU * n / 108, grp = new T.Group();
-      var core = new T.Mesh(b.spacer ? geoM : geoR, b.spacer ? agateMat() : bodhiMat(n * 7));
+    function bodhiMat(k) { var tx = BT[k % BT.length]; return new T.MeshPhysicalMaterial({ map: tx.map, bumpMap: tx.bump, bumpScale: 0.01, color: 0xffffff, emissive: 0xffe2b8, emissiveIntensity: 0, roughness: 0.58, metalness: 0, clearcoat: 0.25, clearcoatRoughness: 0.45, envMapIntensity: 0.32, transparent: true, opacity: 1 }); }
+    function agateMat() { return new T.MeshPhysicalMaterial({ map: agate, color: 0x9c7474, emissive: 0x3a0205, emissiveIntensity: 0, roughness: 0.05, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.02, envMapIntensity: 0.75, reflectivity: 0.8, transparent: true, opacity: 0.93, depthWrite: true }); }
+    var agateCore = new T.MeshBasicMaterial({ color: 0x2c0104 }); // 內層透光，讓瑪瑙有深處的紅光
+    for (n = 1; n <= 108; n++) {
+      var b = KM.BEADS[n], th = ANG[n], grp = new T.Group(), rr = RAD[n];
+      var core = new T.Mesh(b.spacer ? (n === 108 ? geoG : geoM) : geoR, b.spacer ? agateMat() : bodhiMat(n * 7));
       core.castShadow = true;
-      // 珠孔（兩極）朝向串繩方向，並隨機轉動讓斑點各不相同
       var tan = new T.Vector3(Math.cos(th), 0, -Math.sin(th));
       core.quaternion.setFromUnitVectors(YA, tan).multiply(new T.Quaternion().setFromAxisAngle(YA, r() * TAU));
       var wire = new T.Object3D(); wire.material = {}; var glow = new T.Object3D(); glow.material = {};
+      if (b.spacer) { var inner = new T.Mesh(new T.SphereGeometry(rr * 0.72, 32, 24), agateCore); grp.add(inner); }
       grp.add(core, wire, glow);
       grp.position.set(Math.sin(th) * R, 0, Math.cos(th) * R);
       malaGroup.add(grp);
-      var o = { n: n, grp: grp, core: core, wire: wire, glow: glow, spacer: b.spacer, z: b.z, assigned: !!b.term, r: (b.spacer ? RS : RB) * 1.08,
-        cur: { op: 0.85, em: 0.5, wo: 0.35, go: 0.35 }, tgt: { op: 0.85, em: 0.5, wo: 0.35, go: 0.35 }, sc: 1 };
+      var o = { n: n, grp: grp, core: core, wire: wire, glow: glow, spacer: b.spacer, z: b.z, assigned: !!b.term, r: rr * 1.04, base: b.spacer ? 0.93 : 1,
+        cur: { op: 1, em: 0.5, wo: 0, go: 0 }, tgt: { op: 1, em: 0.5, wo: 0, go: 0 }, sc: 1 };
       beads[n] = o;
-      cands.push({ obj: grp, rad: b.spacer ? 1.05 : 0.9, bead: o });
+      cands.push({ obj: grp, rad: n === 108 ? 1.3 : b.spacer ? 1.05 : 0.9, bead: o });
     }
     // 串繩（連續圓環，貫穿所有珠心）
-    var cordMat = new T.MeshStandardMaterial({ color: 0x8e1c22, roughness: 0.85 });
-    stringMesh = new T.Mesh(new T.TorusGeometry(R, 0.07, 8, 256), cordMat);
+    var cordMat = new T.MeshStandardMaterial({ color: 0x3a070b, roughness: 0.9, envMapIntensity: 0.25 });
+    stringMesh = new T.Mesh(new T.TorusGeometry(R, 0.07, 8, 360), cordMat);
     stringMesh.rotation.x = Math.PI / 2; malaGroup.add(stringMesh);
     for (var i = 0; i < 128; i++) { var a = i / 128 * TAU; ringLocal.push(new T.Vector3(Math.sin(a) * R, 0, Math.cos(a) * R)); }
 
-    // 佛頭珠：在第 108 顆（local 角度 0，座標 (0,0,R)）正上方；菩提子大珠＋三通塔頭
-    var gm = bodhiMat(3); gm.emissive.setHex(0xffd9a0);
-    guru = new T.Group(); guru.position.set(0, GY, R);
-    var gb = new T.Mesh(new T.SphereGeometry(1.0, 56, 40), gm); gb.castShadow = true; gb.rotation.z = Math.PI / 2; guru.add(gb);
+    // 佛頭：第四隔珠（環上第 108 顆）兼作佛頭珠，其上加三通塔頭
     var towerMat = bodhiMat(5);
-    var tw = new T.Mesh(new T.CylinderGeometry(0.42, 0.56, 0.75, 32), towerMat); tw.position.y = 1.2; tw.castShadow = true; guru.add(tw);
-    var tr1 = new T.Mesh(new T.TorusGeometry(0.47, 0.07, 10, 32), towerMat); tr1.rotation.x = Math.PI / 2; tr1.position.y = 1.0; guru.add(tr1);
-    var tr2 = new T.Mesh(new T.TorusGeometry(0.42, 0.06, 10, 32), towerMat); tr2.rotation.x = Math.PI / 2; tr2.position.y = 1.4; guru.add(tr2);
-    var tc = new T.Mesh(new T.SphereGeometry(0.42, 24, 12, 0, TAU, 0, Math.PI / 2), towerMat); tc.position.y = 1.57; guru.add(tc);
+    guru = new T.Group(); guru.position.set(0, RG - 0.06, R);
+    var tw = new T.Mesh(new T.CylinderGeometry(0.36, 0.5, 0.7, 40), towerMat); tw.position.y = 0.38; tw.castShadow = true; guru.add(tw);
+    var tr1 = new T.Mesh(new T.TorusGeometry(0.46, 0.07, 12, 40), towerMat); tr1.rotation.x = Math.PI / 2; tr1.position.y = 0.1; guru.add(tr1);
+    var tr2 = new T.Mesh(new T.TorusGeometry(0.37, 0.06, 12, 40), towerMat); tr2.rotation.x = Math.PI / 2; tr2.position.y = 0.66; guru.add(tr2);
+    var tc = new T.Mesh(new T.SphereGeometry(0.36, 32, 12, 0, TAU, 0, Math.PI / 2), towerMat); tc.scale.y = 0.6; tc.position.y = 0.72; guru.add(tc);
     malaGroup.add(guru);
-    var stem = new T.Mesh(new T.CylinderGeometry(0.07, 0.07, GY, 8), cordMat); stem.position.set(0, GY / 2, R); malaGroup.add(stem);
-    cands.push({ act: "part:head", obj: guru, rad: 1.3 });
-    // 飾穗：深紅編繩、結、兩股各串小菩提子（記子）與編織繩尾；向上展開，不遮第 108 顆
-    var knotMat = new T.MeshStandardMaterial({ color: 0x8a1a20, roughness: 0.9 });
-    tassel = new T.Group(); tassel.position.set(0, GY + 1.0, R);
-    var k1 = new T.Mesh(new T.TorusKnotGeometry(0.2, 0.07, 48, 8, 2, 3), knotMat); k1.position.y = 1.05; tassel.add(k1);
-    [-1, 1].forEach(function (sd) {
-      var p0 = new T.Vector3(0, 1.2, 0), p1 = new T.Vector3(sd * 0.75, 3.1, sd * 0.1);
-      var cv = new T.QuadraticBezierCurve3(p0, new T.Vector3(sd * 0.2, 2.2, 0), p1);
-      tassel.add(new T.Mesh(new T.TubeGeometry(cv, 20, 0.055, 6, false), knotMat));
-      [0.38, 0.62, 0.84].forEach(function (u, j) { var bm = new T.Mesh(new T.SphereGeometry(0.2, 24, 16), bodhiMat(j + (sd > 0 ? 3 : 0))); bm.position.copy(cv.getPoint(u)); bm.castShadow = true; tassel.add(bm); });
-      var end = new T.Mesh(new T.CylinderGeometry(0.13, 0.11, 0.42, 12), knotMat); end.position.copy(p1).add(new T.Vector3(sd * 0.06, 0.2, 0)); end.rotation.z = -sd * 0.3; tassel.add(end);
+    cands.push({ act: "part:head", obj: guru, rad: 0.9 });
+    // 飾穗：自塔頭頂端出繩，越過珠外緣後受重力垂下；結下分兩股，各串 6 顆中菩提子，尾端編繩
+    var knotMat = new T.MeshStandardMaterial({ color: 0x420910, roughness: 0.95, envMapIntensity: 0.25 });
+    var top = new T.Vector3(0, guru.position.y + 0.95, R);
+    var drop = new T.Vector3(0, top.y - 0.55, R + RG + 1.5); // 往外（遠離圓心）跨過珠緣
+    var c0 = new T.CubicBezierCurve3(top, new T.Vector3(0, top.y + 0.5, R + 0.4), new T.Vector3(0, top.y + 0.35, drop.z - 0.2), drop);
+    malaGroup.add(new T.Mesh(new T.TubeGeometry(c0, 40, 0.06, 8, false), knotMat));
+    tasselPivot = new T.Group(); tasselPivot.position.copy(drop); malaGroup.add(tasselPivot);
+    tassel = new T.Group(); tasselPivot.add(tassel);
+    var k1 = new T.Mesh(new T.TorusKnotGeometry(0.17, 0.065, 64, 10, 2, 3), knotMat); k1.position.y = -0.3; tassel.add(k1);
+    var MB = 0.21; // 中菩提子
+    [-1, 1].forEach(function (sd, si) {
+      var x0 = sd * 0.06, x1 = sd * 0.3, y0 = -0.5, yEnd = y0 - 0.25 - 6 * 2 * MB - 0.1;
+      var A = new T.Vector3(0, -0.42, 0), B = new T.Vector3(x1, yEnd, 0); // 兩股自結下略微分開，受重力幾乎垂直
+      tassel.add(new T.Mesh(new T.TubeGeometry(new T.LineCurve3(A, B), 8, 0.035, 6, false), knotMat));
+      for (var j = 0; j < 6; j++) { // 6 顆中菩提子沿繩依序相接垂掛
+        var yy = y0 - 0.05 - MB - j * 2 * MB, f = (yy - A.y) / (B.y - A.y);
+        var bm = new T.Mesh(new T.SphereGeometry(MB, 32, 24), bodhiMat(j + si * 3)); bm.position.set(A.x + (B.x - A.x) * f, yy, 0); bm.rotation.set(r() * 3, r() * 3, 0); bm.castShadow = true; tassel.add(bm);
+      }
+      var end = new T.Mesh(new T.CylinderGeometry(0.1, 0.13, 0.45, 16), knotMat); end.position.set(x1, yEnd - 0.2, 0); tassel.add(end);
+      var cap = new T.Mesh(new T.SphereGeometry(0.1, 12, 8), knotMat); cap.position.set(x1, yEnd + 0.03, 0); tassel.add(cap);
     });
     tassel.traverse(function (o) { if (o.isMesh) o.castShadow = true; });
-    var tbx = new T.Object3D(); tbx.position.set(0, 2.1, 0); tassel.add(tbx);
-    malaGroup.add(tassel);
+    var tbx = new T.Object3D(); tbx.position.set(0, -1.9, 0); tassel.add(tbx); tassel.userData.hit = tbx;
     cands.push({ act: "part:tassel", obj: tbx, rad: 1.6 });
   }
+  function angOf(n) { return ANG[((Math.round(n) - 1 + 108) % 108) + 1] + (n - Math.round(n)) * TAU / 108; }
 
   /* ---------- 文字入口（螢幕座標的 HTML 標籤＋引線） ---------- */
   function buildLabels() {
     var set = "parts";
     function add(id, act, text, anchor, mode, off, html) { labelDefs.push({ id: id, act: act, text: text, anchor: anchor, mode: mode, off: off, set: set, html: html }); }
     function partHtml(k) { var p = KM.partText(k); return "<b>" + KM.esc(p.title) + "</b><span>" + KM.esc(p.text) + "</span>"; }
-    var ringPt = function (n) { return function (out) { var th = TAU * n / 108; return out.set(Math.sin(th) * R, 0, Math.cos(th) * R); }; };
+    var ringPt = function (n) { return function (out) { var th = angOf(n); return out.set(Math.sin(th) * R, 0, Math.cos(th) * R); }; };
     var obj = function (o, dy) { return function (out) { o.getWorldPosition(out); out.y += dy || 0; return out; }; };
     var world = function (fn) { return function (out) { fn(out); return malaGroup.localToWorld(out); }; };
     // 部件譬喻（預設）：五種部件，文字與引文一致
     add("head", "part:head", "佛頭珠", function (out) { return guru.getWorldPosition(out); }, "out", 44, partHtml("head"));
-    add("tassel", "part:tassel", "飾穗", function (out) { tassel.getWorldPosition(out); out.y += 2.8; return out; }, "out", 44, partHtml("tassel"));
+    add("tassel", "part:tassel", "飾穗", function (out) { tassel.userData.hit.getWorldPosition(out); return out; }, "out", 44, partHtml("tassel"));
     add("pbead", "part:bead", "數珠", world(ringPt(34)), "out", 46, partHtml("bead"));
     add("pspacer", "part:spacer", "隔珠", world(ringPt(81)), "out", 44, partHtml("spacer"));
     add("string", "part:string", "串繩", world(ringPt(67.5)), "in", 90, partHtml("string"));
@@ -266,7 +280,7 @@
     for (var n = 1; n <= 108; n++) {
       var b = beads[n], t = b.tgt;
       b.assigned = book ? !!KM.BEADS[n].ch : !!KM.BEADS[n].term;
-      if (!b.spacer) b.core.material.color.setHex(b.assigned ? 0xf2dfbd : 0xffffff); // 已配置：較深的蜜色；待配置：原色較淺
+      if (!b.spacer) b.core.material.color.setHex(b.assigned ? 0xecdcc0 : 0xffffff); // 已配置：較深的蜜色；待配置：原色較淺
       if (b.spacer) { t.op = 1; t.em = 0.6; t.wo = 0; t.go = 0; }
       else if (b.assigned) { t.op = 1; t.em = 0.6; t.wo = 0; t.go = 0; }
       else { t.op = 1; t.em = 0.6; t.wo = 0; t.go = 0; }
@@ -283,7 +297,7 @@
     for (var n = 1; n <= 108; n++) {
       var b = beads[n], c = b.cur, t = b.tgt;
       c.op += (t.op - c.op) * k; c.em += (t.em - c.em) * k; c.wo += (t.wo - c.wo) * k; c.go += (t.go - c.go) * k;
-      b.core.material.opacity = c.op; b.core.material.emissiveIntensity = Math.max(0, c.em - 0.8) * 0.35; b.core.material.transparent = c.op < 0.99;
+      b.core.material.opacity = c.op * b.base; b.core.material.emissiveIntensity = Math.max(0, c.em - 0.8) * 0.35; b.core.material.transparent = b.spacer || c.op < 0.99;
       b.grp.position.y = (paused || reduce) ? 0 : Math.sin(tt * 1.6 + n * 0.35) * 0.16 * bobAmp;
     }
   }
@@ -307,12 +321,12 @@
     var dur = reduce ? 0.01 : 1.9, camTo, tgtTo, rotTo = null;
     var f = Math.max(1, 1.45 / aEff());
     var fb = focusBead(sel);
-    if (fb) rotTo = -TAU * fb / 108;
-    else if (sel && sel.k === "zone") rotTo = -TAU * (D.zones[sel.z].first + 13) / 108;
+    if (fb) rotTo = -angOf(fb);
+    else if (sel && sel.k === "zone") rotTo = -angOf(D.zones[sel.z].first + 13);
     else if (sel && sel.k === "part" && (sel.id === "head" || sel.id === "tassel")) rotTo = 0;
     if (fb) { camTo = new T.Vector3(0, 6.5, R + 13); tgtTo = new T.Vector3(0, 0, R); }
     else if (sel && sel.k === "zone") { camTo = new T.Vector3(0, 16 * f, R + 28 * f); tgtTo = new T.Vector3(0, 0, R - 5); }
-    else if (sel && sel.k === "part" && (sel.id === "head" || sel.id === "tassel")) { camTo = new T.Vector3(0, 9, R + 17); tgtTo = new T.Vector3(0, 3, R); }
+    else if (sel && sel.k === "part" && (sel.id === "head" || sel.id === "tassel")) { camTo = new T.Vector3(0, 5.5, R + 15); tgtTo = new T.Vector3(0, 0.2, R + 0.8); }
     else { camTo = overviewPos(); tgtTo = new T.Vector3(0, 0, 0); }
     G.killTweensOf(camera.position); G.killTweensOf(controls.target); if (rotTween) rotTween.kill();
     controls.enabled = false;
@@ -360,7 +374,7 @@
         d.el.style.display = "";
         d.anchor(tmp); var a = toScreen(tmp), dx = a.x - ctr.x, dy = a.y - ctr.y, m = Math.hypot(dx, dy) || 1; dx /= m; dy /= m;
         if (d.mode === "in") { dx = -dx; dy = -dy; }
-        if (d.id === "head" || d.id === "head2" || d.id === "tassel") { dx = d.id === "tassel" ? 0.75 : -0.75; dy = -0.66; } // 斜上方，避免蓋住第 108 顆兩側的珠子
+        if (d.id === "head" || d.id === "head2" || d.id === "tassel") { dx = d.id === "tassel" ? 0.85 : -0.75; dy = d.id === "tassel" ? 0.5 : -0.66; } // 佛頭往左上、飾穗往右，避免蓋住珠子
         if (d.set === "book" && a.z > 1) { d.el.style.display = "none"; d.path.style.display = "none"; return; }
         if (d.id === "sp3") { dx = 0.8; dy = 0.6; } // 第四隔珠：標籤放右下，避開正上方的佛頭珠
         var lx = a.x + dx * d.off, ly = a.y + dy * d.off, tx = dx > 0.35 ? "0" : dx < -0.35 ? "-100%" : "-50%";
@@ -447,7 +461,8 @@
     spinV += ((idle ? 0.07 : 0) - spinV) * Math.min(1, dt * 2.5); if (paused || reduce) spinV = 0;
     if (!(rotTween && rotTween.isActive())) malaGroup.rotation.y -= spinV * dt;
     bobAmp += ((focused ? 0 : 1) - bobAmp) * Math.min(1, dt * 3);
-    lerpBeads(Math.min(0.3, raw)); // 淡入淡出依實際時間，慢裝置也能及時完成
+    lerpBeads(Math.min(0.3, raw));
+    if (tasselPivot) { tasselPivot.rotation.x = (paused || reduce) ? 0 : Math.sin(tt * 0.9) * 0.05; tasselPivot.rotation.z = (paused || reduce) ? 0 : Math.sin(tt * 0.7 + 1) * 0.035; } // 微風般輕擺 // 淡入淡出依實際時間，慢裝置也能及時完成
     controls.update();
     updateOverlays();
     renderer.render(scene, camera);
@@ -464,7 +479,7 @@
   API.setLines = function (v) { lines = !!v; stage.classList.toggle("nolines", !lines); };
   API.hint = function () {};
   API.screenOf = function (n) { // 供測試：第 n 顆珠在頁面上的座標
-    var o = n === "head" ? guru : n === "tassel" ? tassel : beads[n].grp; o.getWorldPosition(tmp); var s = toScreen(tmp), r = renderer.domElement.getBoundingClientRect();
+    var o = n === "head" ? guru : n === "tassel" ? tassel.userData.hit : beads[n].grp; o.getWorldPosition(tmp); var s = toScreen(tmp), r = renderer.domElement.getBoundingClientRect();
     return { x: r.left + s.x, y: r.top + s.y, z: s.z };
   };
   API.stats = function () {
@@ -476,8 +491,9 @@
       out.axisErr = Math.max(out.axisErr, Math.abs(Math.hypot(P[n].x, P[n].z) - R));
     }
     for (var m = 1; m <= 108; m++) { var m2 = m % 108 + 1; out.minGap = Math.min(out.minGap, P[m].distanceTo(P[m2]) - beads[m].r - beads[m2].r); }
-    out.guruAbove = guru.position.y > 1 && Math.hypot(guru.position.x - P[108].x, guru.position.z - P[108].z) < 0.01;
-    out.tasselAbove = tassel.position.y > guru.position.y;
+    out.guruAbove = guru.position.y > 0.5 && Math.hypot(guru.position.x - P[108].x, guru.position.z - P[108].z) < 0.01; // 三通塔頭在第四隔珠正上方
+    out.headIsSpacer108 = beads[108].spacer && RAD[108] > RS;
+    var tw = new T.Vector3(); tassel.userData.hit.getWorldPosition(tw); malaGroup.worldToLocal(tw); out.tasselHangs = tw.y < guru.position.y && Math.hypot(tw.x, tw.z) > R + RG; // 飾穗垂在珠外緣下方
     out.strings = malaGroup.children.filter(function (c) { return c === stringMesh; }).length;
     out.rotY = malaGroup.rotation.y; out.cam = camera.position.toArray();
     return out;
