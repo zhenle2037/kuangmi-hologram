@@ -1,12 +1,12 @@
-# 以數珠為喻 — 《狂密與真密》導覽（全息版）
+# 以數珠為喻 — 《狂密與真密》導覽（紙感版）
 
 純靜態網站，入口 `index.html`。3D 以 three.js r128（MIT）＋ OrbitControls ＋ GSAP 3.12.2 呈現，函式庫放在 `vendor/`（不依賴 CDN）。
 
 - 內容資料：`data/content.js`（目次、名相、珠位配置、部件說明；補充正文只改此檔）
 - 狀態、面板、目次：`app.js`
-- 3D 星系與念珠、飛近特寫、引線與文字入口：`scene.js`
+- 3D 念珠、拉近特寫、引線與文字入口：`scene.js`
 - 樣式：`style.css`
-- 驗證：`NODE_PATH=$(npm root -g) node tools/verify.cjs file://$PWD/index.html <截圖資料夾>`（Playwright＋SwiftShader，針對本版）
+- 驗證：`NODE_PATH=$(npm root -g) node tools/verify.cjs file://$PWD/index.html <截圖資料夾>`（Playwright＋SwiftShader，原為全息版撰寫，紙感版沿用）
 
 WebGL 無法啟動時，面板與原書目次仍可完整使用。
 

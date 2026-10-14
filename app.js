@@ -6,7 +6,7 @@
   var esc = function (s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); };
   var SRC = { book: "書籍目次", quote: "平實導師引文", nav: "本站導覽分類" };
   var tag = function (k) { return '<span class="tag ' + k + '">' + SRC[k] + "</span>"; };
-  var ZCOLOR = { jian: "#6fe3f0", xiu: "#ffd27a", xing: "#c9a8ff", guo: "#ff8f9d" };
+  var ZCOLOR = { jian: "#2f6690", xiu: "#a8741a", xing: "#6a52a3", guo: "#b3261e" };
 
   var chById = {}, termById = {}, extraById = {};
   D.chapters.forEach(function (c) { chById[c.id] = c; });
@@ -69,11 +69,11 @@
     var el = $("#pane-content"), h = "";
     if (!sel) {
       h = '<p class="crumb">總覽</p><h2>請選取念珠、文字或目次</h2>' +
-        "<p>拖曳可旋轉視角。點「見、修、行、果」隔珠或標籤，查看該區名相；點已配置的數珠，念珠會轉動並飛近，把它停在畫面中央；或切到「原書目次」按章瀏覽。左右切換只會在已配置內容的珠位間移動。</p>" +
+        "<p>拖曳可旋轉視角。點「見、修、行、果」隔珠或標籤，查看該區名相；點已配置的數珠，念珠會緩緩轉動並拉近，把它停在畫面中央；或切到「原書目次」按章瀏覽。左右切換只會在已配置內容的珠位間移動。</p>" +
         '<h3>四個區段</h3><div class="chips">' + D.zones.map(function (zn) { return '<button class="chip zone-' + zn.id + '" data-go="zone:' + zn.idx + '">' + esc(zn.name) + " 區 <small>" + zn.first + "–" + zn.last + "</small></button>"; }).join("") + "</div>" +
         '<h3>部件</h3><div class="chips">' + ["bead", "head", "tassel", "string"].map(function (k) { return '<button class="chip" data-go="part:' + k + '">' + esc(D.parts[k].title.replace(/（.*$/, "")) + "</button>"; }).join("") +
         D.zones.map(function (zn) { return '<button class="chip" data-go="spacer:' + zn.idx + '">' + zn.spacerName + "・" + esc(zn.spacerTitle) + "</button>"; }).join("") + "</div>" +
-        '<div class="notice">環上 108 顆＝104 顆普通數珠＋4 顆隔珠（編號 27、54、81、108）；佛頭珠另計，與第四隔珠是不同部件。「見修行果」是本網站的導覽分類，不是引文原意。暗淡的珠子為待配置珠位。</div>';
+        '<div class="notice">環上 108 顆＝104 顆普通數珠＋4 顆隔珠（編號 27、54、81、108）；佛頭珠另計，與第四隔珠是不同部件。「見修行果」是本網站的導覽分類，不是引文原意。顏色較淺的珠子為待配置珠位。</div>';
     } else if (sel.k === "bead") {
       var b = BEADS[sel.n], zn = D.zones[b.z], t = termById[b.term];
       h = zoneHead(zn) + "<h2>" + esc(t.name) + "</h2>" +
