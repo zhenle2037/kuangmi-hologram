@@ -133,3 +133,103 @@ footer{text-align:center;color:var(--mut);font-size:.85rem;padding:20px 16px 40p
   .controls button,.controls select{font-size:14px;min-height:40px;background:rgba(255,255,255,.7)}
   .pane h2{font-size:1.2rem}
 }
+
+/* ===== 禪林背景（AI 生成示意，黑白低對比） ===== */
+.zen{position:absolute;inset:0;z-index:0;pointer-events:none;background:url(assets/zen-forest.jpg) center/cover no-repeat;opacity:.34;filter:blur(1.5px) contrast(.85);
+  -webkit-mask-image:radial-gradient(ellipse 62% 58% at 40% 52%,rgba(0,0,0,.25) 0%,#000 78%);mask-image:radial-gradient(ellipse 62% 58% at 40% 52%,rgba(0,0,0,.25) 0%,#000 78%)}
+.stage{z-index:1}
+@media (prefers-reduced-motion:no-preference){.zen{animation:mist 40s ease-in-out infinite alternate}}
+@keyframes mist{from{transform:scale(1.02) translateX(-6px)}to{transform:scale(1.05) translateX(6px)}}
+
+/* ===== 模式切換 ===== */
+.modes{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:rgba(255,255,255,.75)}
+.modes button{min-height:42px;padding:6px 18px;border:0;background:none;cursor:pointer;letter-spacing:.12em;color:var(--mut);font-size:15px}
+.modes button+button{border-left:1px solid var(--line)}
+.modes button[aria-pressed=true]{background:var(--acc);color:#fff;font-weight:700}
+.modes button:focus-visible,.controls button:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+#zoneview[aria-pressed=true]{border-color:var(--acc);color:var(--acc)}
+body.mode-book .mala-only{display:none}
+
+/* ===== 3D 旁文字 ===== */
+.lab{font-size:16px;color:#2b2521;text-shadow:0 0 6px rgba(248,244,236,.95),0 0 2px rgba(248,244,236,.95)}
+.lab-part{white-space:normal;width:max-content;max-width:250px;line-height:1.5;text-align:left}
+.lab-part b{display:block;font-size:17px;color:var(--acc);letter-spacing:.12em}
+.lab-part span{display:block;font-size:14px;color:#3d342d}
+.lab-book{font-size:14.5px}
+#fan .nb{position:absolute;left:0;top:0;pointer-events:auto;background:rgba(255,252,247,.82);border:0;border-radius:4px;padding:2px 8px;cursor:pointer;color:#5b5047;font-size:14px;white-space:nowrap}
+#fan .nb:hover,#fan .nb:focus-visible{color:var(--acc);outline:none;text-decoration:underline}
+#callout b{text-shadow:0 0 8px rgba(248,244,236,.95)}
+#callout small{font-size:14.5px;color:#3d342d;max-width:420px;white-space:normal}
+#fan .fl{color:#2b2521;text-shadow:0 0 6px rgba(248,244,236,.95)}
+
+/* ===== 引文折疊 ===== */
+#quote-toggle{margin-top:8px;border:0;background:none;padding:6px 0;min-height:36px;color:var(--acc);cursor:pointer;font-size:14.5px;letter-spacing:.06em;text-decoration:underline;text-underline-offset:3px}
+#main-quote p#quote{font-size:17px}
+.sr-only{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* ===== 面板內容 ===== */
+.guide{font-size:1.02rem;color:var(--acc);font-weight:700;margin:.3em 0}
+.small{font-size:.86rem}
+.parts{list-style:none;margin:.3em 0;padding:0}
+.prow{display:block;width:100%;text-align:left;border:0;border-bottom:1px solid var(--line);background:none;padding:8px 2px;cursor:pointer}
+.prow b{color:var(--acc);margin-right:.6em;letter-spacing:.1em}
+.prow span{font-size:.93rem}
+.prow:hover b,.prow:focus-visible b{text-decoration:underline}
+.chip.cross{border-style:dashed}
+.box.big{font-size:1.08rem;line-height:1.8}
+.cnt{font-size:.8rem;color:var(--mut);font-weight:400}
+.notes{margin:.3em 0;padding-left:1.2em;font-size:.92rem}
+.refs{list-style:none;margin:.3em 0;padding:0}
+.refs li{border-bottom:1px solid var(--line)}
+.ref{display:block;width:100%;text-align:left;border:0;background:none;padding:7px 2px;cursor:pointer;font-size:.9rem;line-height:1.6}
+.ref:hover,.ref:focus-visible{background:rgba(155,34,38,.05)}
+.rk{display:inline-block;font-size:.72rem;border:1px solid currentColor;border-radius:3px;padding:0 4px;margin-right:6px;vertical-align:1px}
+.rk.direct{color:#2f6690}.rk.rel{color:#a8741a}.rk.chonly{color:var(--mut)}
+.batchbar{display:flex;align-items:center;justify-content:space-between;gap:6px;margin:.6em 0 .3em}
+.batchbar .bt{min-height:40px;padding:4px 10px;border:1px solid var(--line);border-radius:6px;background:#fff;cursor:pointer;font-size:.88rem}
+.batchbar .bt:disabled{opacity:.35;cursor:default}
+.batchbar .range{font-size:.88rem;color:var(--mut)}
+.secs,.chlist,.items{list-style:none;margin:0;padding:0}
+.srow,.irow{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:baseline;width:100%;text-align:left;border:0;border-bottom:1px solid var(--line);background:none;padding:8px 2px;cursor:pointer;min-height:44px}
+.srow .sn,.irow .sn{color:var(--acc);font-size:.88rem;white-space:nowrap}
+.srow .st{font-size:.98rem;line-height:1.55}
+.srow .pg,.irow .pg{font-size:.8rem;color:var(--mut);white-space:nowrap}
+.srow:hover,.irow:hover,.srow.on{background:rgba(155,34,38,.05)}
+.items{margin-left:1.6em}
+.irow{padding:5px 2px;min-height:38px}
+.irow .st{font-size:.9rem;color:#3d342d}
+.items.open{margin:.4em 0 .4em .4em}
+.chh{font-size:1.15rem!important}
+.sech{color:var(--fg)!important;font-size:1.1rem!important;letter-spacing:0!important;margin:.2em 0!important}
+.secfocus{border-top:1px solid var(--line);margin-top:.6em;padding-top:.4em}
+.prose{white-space:pre-wrap}
+.fig{margin:.8em 0}
+.fig img{width:100%;height:auto;border-radius:6px;display:block}
+.fig figcaption{font-size:.82rem;color:var(--mut);margin-top:4px}
+.fig.wide{max-width:720px}
+
+/* ===== 完整目次 ===== */
+#pane-toc h4{margin:1em 0 .3em;font-size:.9rem;color:var(--acc);letter-spacing:.2em}
+.tocch{border-bottom:1px solid var(--line)}
+.tocch summary{list-style:none;cursor:pointer}
+.tocch summary::-webkit-details-marker{display:none}
+.tocch .row{display:flex;width:100%;gap:8px;align-items:baseline;text-align:left;min-height:44px;padding:8px 4px;border:0;background:none;cursor:pointer}
+.tocch .row .n{flex:none;min-width:1.8em;color:var(--mut)}
+.tocch .row .cnt{margin-left:auto;flex:none}
+.tocch ol{list-style:none;margin:0 0 .5em;padding:0 0 0 1.8em}
+.tocch ol.ti{padding-left:1.4em;margin:0}
+.trow{display:flex;justify-content:space-between;gap:8px;width:100%;text-align:left;border:0;background:none;padding:4px 2px;cursor:pointer;font-size:.88rem;line-height:1.5}
+.trow i{font-style:normal;color:var(--mut);font-size:.78rem;white-space:nowrap}
+.trow:hover,.trow.on,.tocch .row.on{background:rgba(155,34,38,.06)}
+
+@media (max-width:900px){
+  .zen{position:fixed;opacity:.22}
+  .dock{gap:10px}
+  .modes{align-self:stretch}.modes button{flex:1}
+  #main-quote p#quote{font-size:16px}
+}
+@media (max-width:900px){
+  #callout{width:min(86vw,340px)}
+  #callout small{white-space:normal;line-height:1.45}
+  #fan .nb{font-size:12.5px}
+}

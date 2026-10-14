@@ -1,153 +1,280 @@
-/* 數珠導覽 — 狀態、內容面板、目次與導覽。內容全部來自 data/content.js；3D 畫面在 scene.js。 */
+/* 數珠導覽 — 狀態、內容面板、目次與導覽。內容全部來自 data/content.js；3D 畫面在 scene.js。
+ * 兩種模式共用同一串念珠：
+ *   mala ＝「以數珠為喻」：部件譬喻、見修行果四區、76 個名相主珠位
+ *   book ＝「原書導讀」：17 章各配 1 顆普通數珠，章→節→目分層閱讀 */
 (function () {
   "use strict";
   var D = window.KM_DATA;
   var $ = function (s) { return document.querySelector(s); };
-  var esc = function (s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); };
-  var SRC = { book: "書籍目次", quote: "平實導師引文", nav: "本站導覽分類" };
+  var esc = function (s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); };
+  var SRC = { book: "原書目次", quote: "平實導師引文", nav: "本站導覽分類" };
   var tag = function (k) { return '<span class="tag ' + k + '">' + SRC[k] + "</span>"; };
   var ZCOLOR = { jian: "#2f6690", xiu: "#a8741a", xing: "#6a52a3", guo: "#b3261e" };
+  var GROUP_Z = { "見": 0, "修": 1, "行": 2, "果": 3 };
+  var PART_KEYS = ["bead", "spacer", "head", "tassel", "string"];
+  var CN = "零一二三四五六七八九";
+  function cn(n) { n = +n; if (n <= 10) return n === 10 ? "十" : CN[n]; var t = Math.floor(n / 10), o = n % 10; return (t > 1 ? CN[t] : "") + "十" + (o ? CN[o] : ""); }
+  var VOLNAME = function (v) { return "第" + cn(v) + "輯"; };
 
-  var chById = {}, termById = {}, extraById = {};
-  D.chapters.forEach(function (c) { chById[c.id] = c; });
+  /* ---------- 索引 ---------- */
+  var chById = {}, termById = {}, extraById = {}, secById = {};
+  D.chapters.forEach(function (c) {
+    chById[c.id] = c;
+    c.sections.forEach(function (s) {
+      s.ch = c.id; secById[s.id] = s;
+      (s.items || []).forEach(function (it) { it.ch = c.id; it.parent = s.id; secById[it.id] = it; });
+    });
+  });
   D.terms.forEach(function (t) { termById[t.id] = t; });
   D.extras.forEach(function (x) { extraById[x.id] = x; });
+  function secLabel(s) { var base = String(s.no).replace(/[^0-9]/g, ""); return s.parent ? "第" + cn(base) + "目" : "第" + cn(base) + "節"; }
+  function chLabel(c) { return "第" + cn(c.no) + "章"; }
+  function shortTitle(t) { return String(t).split("——")[0]; }
+  function volText(vols) { return vols.map(VOLNAME).join("、"); }
 
-  /* ---------- 珠位模型（唯一準則：每 26 顆普通數珠後接 1 顆隔珠） ---------- */
+  /* ---------- 珠位模型（每 26 顆普通數珠後接 1 顆隔珠；名相依 slot 唯一主珠位） ---------- */
   var BEADS = [];
   for (var n = 1; n <= 108; n++) {
     var z = Math.floor((n - 1) / 27), r = ((n - 1) % 27) + 1;
-    BEADS[n] = { n: n, z: z, pos: r, spacer: r === 27, term: null };
+    BEADS[n] = { n: n, z: z, pos: r, spacer: r === 27, term: null, ch: null };
   }
-  D.zones.forEach(function (zn, zi) {
-    zn.idx = zi; zn.first = zi * 27 + 1; zn.last = zi * 27 + 26; zn.spacerNo = zi * 27 + 27;
-    zn.terms.forEach(function (tid, i) { BEADS[zn.first + i].term = tid; });
+  D.zones.forEach(function (zn, zi) { zn.idx = zi; zn.first = zi * 27 + 1; zn.last = zi * 27 + 26; zn.spacerNo = zi * 27 + 27; zn.group = ["見", "修", "行", "果"][zi]; });
+  var slotErr = [];
+  D.terms.forEach(function (t) {
+    var b = BEADS[t.slot], zi = GROUP_Z[t.group];
+    if (!b || b.spacer || b.z !== zi || b.term) { slotErr.push(t.name); return; } // 防呆：越界、放在隔珠或重複珠位
+    b.term = t.id;
   });
+  if (slotErr.length && window.console) console.warn("名相珠位設定有誤，已略過：", slotErr);
   var ASSIGNED = BEADS.filter(function (b) { return b && b.term; }).map(function (b) { return b.n; });
-  function zonesOfChapter(cid) {
-    return D.zones.filter(function (zn) { return zn.chapters.some(function (c) { return c.id === cid; }); });
+  // 原書導讀：17 章依章序平均配置到 17 顆普通數珠
+  var ORD = BEADS.filter(function (b) { return b && !b.spacer; }).map(function (b) { return b.n; });
+  var CH_BEAD = {}, CH_ORDER = [];
+  D.chapters.forEach(function (c, i) { var bn = ORD[6 + Math.round(i * 86 / (D.chapters.length - 1))]; /* 第 7–96 顆間平均分布，避開佛頭珠附近 */ CH_BEAD[c.id] = bn; BEADS[bn].ch = c.id; CH_ORDER.push(c.id); });
+
+  function termsOfZone(zi) { // 主珠位在本區者，加上可跨類顯示於本區者
+    var g = ["見", "修", "行", "果"][zi];
+    return D.terms.filter(function (t) { return t.show.indexOf(g) >= 0; }).sort(function (a, b) {
+      var pa = a.group === g ? 0 : 1, pb = b.group === g ? 0 : 1; return pa - pb || a.slot - b.slot;
+    });
+  }
+  function termsOfSec(id) { return D.terms.filter(function (t) { return t.refs.some(function (r) { return r.sec === id || (secById[r.sec] && secById[r.sec].parent === id); }); }); }
+  function termsOfChapter(cid) { return D.terms.filter(function (t) { return t.refs.some(function (r) { return r.ch === cid; }); }); }
+
+  var sel = null, mode = "mala", zoneView = false, lastBead = 0, has3D = false, batch = {}, narrowMQ = window.matchMedia("(max-width:900px)");
+  var KM = window.KM = {
+    D: D, BEADS: BEADS, ASSIGNED: ASSIGNED, CH_BEAD: CH_BEAD, termById: termById, chById: chById, secById: secById, esc: esc,
+    go: function (a, o) { go(a, o); }, getSel: function () { return sel; }, getMode: function () { return mode; },
+    actForBead: actForBead, focusInfo: focusInfo, partText: function (k) { return D.parts[k]; }, shortTitle: shortTitle, chLabel: chLabel
+  };
+
+  function actForBead(bn) {
+    var b = BEADS[bn];
+    if (mode === "book") return b.ch ? "chapter:" + b.ch : null;
+    if (b.spacer) return "spacer:" + b.z;
+    return b.term ? "bead:" + bn : "empty:" + bn;
   }
 
-  var sel = null, lastBead = 0, has3D = false;
-  var KM = window.KM = { D: D, BEADS: BEADS, ASSIGNED: ASSIGNED, termById: termById, chById: chById, zonesOfChapter: zonesOfChapter, esc: esc,
-    go: function (a, o) { go(a, o); }, getSel: function () { return sel; } };
+  /* ---------- 3D 聚焦時的文字（標題、相鄰珠名、章名引線） ---------- */
+  function focusInfo(s) {
+    if (!s) return null;
+    var o = { n: 0, name: "", sub: "", fan: [], neighbors: [] };
+    if (s.k === "bead" || s.k === "empty") {
+      var b = BEADS[s.n], zn = D.zones[b.z]; o.n = s.n;
+      if (b.term) {
+        var t = termById[b.term]; o.name = t.name;
+        var seen = {}; t.refs.forEach(function (r) { if (r.ch && !seen[r.ch]) { seen[r.ch] = 1; var c = chById[r.ch]; o.fan.push({ text: chLabel(c) + " " + shortTitle(c.title), act: "chapter:" + c.id }); } });
+      } else o.name = "待配置珠位";
+      o.sub = zn.name + "區 第 " + b.pos + "／26 珠 ・ 環上 " + s.n + "／108";
+      [-2, -1, 1, 2].forEach(function (d) { var m = ((s.n - 1 + d + 108) % 108) + 1, bb = BEADS[m]; if (bb.term) o.neighbors.push({ n: m, text: termById[bb.term].name }); });
+    } else if (s.k === "spacer") {
+      var z2 = D.zones[s.z]; o.n = z2.spacerNo; o.name = z2.spacerName + "：" + z2.spacerTitle; o.sub = "環上 " + o.n + "／108 ・ 隔開其前 26 顆數珠";
+    } else if (s.k === "chapter" || s.k === "sec") {
+      var c2 = chById[s.k === "chapter" ? s.id : secById[s.id].ch]; o.n = CH_BEAD[c2.id];
+      o.name = chLabel(c2); o.sub = c2.title;
+      [-1, 1].forEach(function (d) { var i = CH_ORDER.indexOf(c2.id) + d; if (i >= 0 && i < CH_ORDER.length) { var cc = chById[CH_ORDER[i]]; o.neighbors.push({ n: CH_BEAD[cc.id], text: chLabel(cc) + " " + shortTitle(cc.title) }); } });
+    } else return null;
+    return o;
+  }
 
   /* ---------- 選取 ---------- */
   function parseAct(a) { var i = a.indexOf(":"); return { k: a.slice(0, i), v: a.slice(i + 1) }; }
   function hashOf(s) {
-    return s.k === "bead" ? "bead-" + s.n : s.k === "spacer" || s.k === "zone" ? s.k + "-" + s.z : s.k === "part" ? "part-" + s.id : s.k === "chapter" ? "ch-" + s.id : s.id;
+    return s.k === "bead" || s.k === "empty" ? "bead-" + s.n : s.k === "spacer" || s.k === "zone" ? s.k + "-" + s.z : s.k === "part" ? "part-" + s.id : s.k === "chapter" ? "ch-" + s.id : s.k === "sec" ? "sec-" + s.id : "x-" + s.id;
   }
   function select(s, opt) {
     opt = opt || {};
-    sel = s; if (s && s.k === "bead") lastBead = s.n;
-    renderPanel(); syncToc();
+    var want = s && (s.k === "chapter" || s.k === "sec" || s.k === "extra") ? "book" : s ? "mala" : mode;
+    if (want !== mode) setMode(want, true);
+    sel = s; if (s && (s.k === "bead" || s.k === "empty")) lastBead = s.n;
+    renderPanel(); syncToc(); syncNav();
     if (has3D) window.KM3D.setSelection(s);
-    if (opt.hash !== false) { try { history.replaceState(null, "", s ? "#" + hashOf(s) : location.pathname + location.search); } catch (e) {} }
+    if (opt.hash !== false) { try { history.replaceState(null, "", s ? "#" + hashOf(s) : mode === "book" ? "#book" : location.pathname + location.search); } catch (e) {} }
     if (opt.tab !== false) showTab("content");
+  }
+  function setMode(m, quiet) {
+    mode = m; if (m === "book") zoneView = false;
+    document.body.classList.toggle("mode-book", m === "book");
+    $("#mode-mala").setAttribute("aria-pressed", m === "mala"); $("#mode-book").setAttribute("aria-pressed", m === "book");
+    if (has3D) window.KM3D.setMode(m, zoneView);
+    if (!quiet) select(null);
+  }
+  function setZoneView(on) {
+    zoneView = on; if (has3D) window.KM3D.setMode(mode, zoneView);
+    var b = $("#zoneview"); if (b) { b.setAttribute("aria-pressed", on); b.textContent = on ? "回到部件譬喻" : "依四區查看名相"; }
+  }
+  function syncNav() {
+    var book = mode === "book";
+    $("#prev").textContent = book ? "‹ 上一章" : "‹ 上一珠"; $("#next").textContent = book ? "下一章 ›" : "下一珠 ›";
+    $("#prev").setAttribute("aria-label", book ? "上一章" : "上一個已配置珠位"); $("#next").setAttribute("aria-label", book ? "下一章" : "下一個已配置珠位");
+    $("#home").textContent = "返回整串";
+    $("#zoneview").hidden = book;
   }
 
   /* ---------- 面板 ---------- */
-  function chipsForChapters(list) {
-    return '<div class="chips">' + list.map(function (c) {
-      var ch = chById[c.id];
-      return '<button class="chip" data-go="chapter:' + ch.id + '">第' + ch.no + "章 " + esc(ch.title) + (c.partial ? " <small>（部分內容）</small>" : "") + "</button>";
-    }).join("") + "</div>";
+  function chip(act, html, cls) { return '<button class="chip' + (cls ? " " + cls : "") + '" data-go="' + act + '">' + html + "</button>"; }
+  function pendBlock(o) {
+    o = o || {};
+    var h = "<h3>原書正文 " + tag("book") + "</h3>" + (o.body ? '<div class="prose">' + esc(o.body) + "</div>" : '<p class="pend">正文待補。</p>');
+    h += "<h3>整理說明 " + tag("nav") + "</h3>" + (o.explanation ? '<div class="prose">' + esc(o.explanation) + "</div>" : '<p class="pend">解說待補（不以推測代替）。</p>');
+    if (o.image) h += '<figure class="fig"><img src="' + esc(o.image) + '" alt="' + esc(o.imageCaption || "") + '" loading="lazy"><figcaption>' + esc(o.imageCaption || "圖片來源待註明") + "</figcaption></figure>";
+    return h;
   }
-  function pendBlock() { return '<h3>正文・解說・出處</h3><p class="pend">正文待補。（解說、出處、相關名相欄位已預留於 data/content.js。）</p>'; }
-  function zoneHead(zn) { return '<p class="crumb zone-' + zn.id + '">' + esc(zn.name) + "區 ・ 數珠 " + zn.first + "–" + zn.last + "，隔珠 " + zn.spacerNo + "</p>"; }
+  function refList(refs) {
+    return '<ul class="refs">' + refs.map(function (r) {
+      var k = r.kind === "直接" ? "direct" : r.kind === "關聯" ? "rel" : "chonly";
+      var label = '<span class="rk ' + k + '">' + esc(r.kind) + "</span>" + esc(r.text);
+      return "<li>" + (r.sec && secById[r.sec] ? '<button class="ref" data-go="sec:' + r.sec + '">' + label + "</button>" : r.ch ? '<button class="ref" data-go="chapter:' + r.ch + '">' + label + "</button>" : label) + "</li>";
+    }).join("") + "</ul>";
+  }
+  function zoneHead(zn) { return '<p class="crumb zone-' + zn.id + '">以數珠為喻 ・ ' + esc(zn.name) + "區 ・ 數珠 " + zn.first + "–" + zn.last + "，隔珠 " + zn.spacerNo + "</p>"; }
   function zoneBody(zn) {
+    var ts = termsOfZone(zn.idx), own = ts.filter(function (t) { return t.group === zn.group; });
     var h = "<h3>分類說明 " + tag("nav") + '</h3><div class="box"><p>' + esc(zn.summary) + "</p><p>核心：" + esc(zn.core) + "</p></div>";
-    h += '<h3>相關名相（已配置珠位）</h3><div class="chips">' + zn.terms.map(function (tid, i) {
-      var n = zn.first + i;
-      return '<button class="chip" data-go="bead:' + n + '">' + (i + 1) + ". " + esc(termById[tid].name) + " <small>珠" + n + "</small></button>";
+    h += "<h3>本區名相</h3><div class=\"chips\">" + ts.map(function (t) {
+      return t.group === zn.group ? chip("bead:" + t.slot, esc(t.name) + " <small>珠" + t.slot + "</small>")
+        : chip("bead:" + t.slot, esc(t.name) + " <small>跨類顯示・主珠位在" + esc(t.group) + "區 珠" + t.slot + "</small>", "cross");
     }).join("") + "</div>";
-    h += '<p class="pend" style="font-size:.88rem">本區 26 個珠位中，已配置 ' + zn.terms.length + " 個，其餘 " + (26 - zn.terms.length) + " 個待配置。</p>";
-    h += "<h3>主要對應章 " + tag("nav") + '</h3><p style="margin:.2em 0;font-size:.92rem">' + esc(zn.mainNote) + "</p>" + chipsForChapters(zn.chapters);
+    h += '<p class="pend small">本區 26 個珠位中，已配置 ' + own.length + " 個主名相，其餘 " + (26 - own.length) + " 個待配置。此為初始可調整配置。</p>";
+    return h;
+  }
+  function batchSize() { return narrowMQ.matches ? 5 : 7; }
+  function chapterBody(c, focusSec) {
+    var secs = c.sections, bs = batchSize(), total = secs.length;
+    var idx = focusSec ? secs.indexOf(focusSec) : -1;
+    var st = batch[c.id] != null ? batch[c.id] : 0;
+    if (idx >= 0 && (idx < st || idx >= st + bs)) st = Math.floor(idx / bs) * bs;
+    st = Math.max(0, Math.min(st, Math.floor((total - 1) / bs) * bs)); batch[c.id] = st;
+    var end = Math.min(total, st + bs);
+    var h = '<div class="batchbar"><button class="bt" data-batch="' + c.id + ':-1"' + (st === 0 ? " disabled" : "") + ' aria-label="前一批節">‹ 前一批</button>' +
+      '<span class="range">第 ' + (st + 1) + "–" + end + " 節／共 " + total + " 節</span>" +
+      '<button class="bt" data-batch="' + c.id + ':1"' + (end >= total ? " disabled" : "") + ' aria-label="後一批節">後一批 ›</button></div>';
+    h += '<ol class="secs">' + secs.slice(st, end).map(function (s) {
+      var on = focusSec === s ? " on" : "";
+      var row = '<li><button class="srow' + on + '" data-go="sec:' + s.id + '"><span class="sn">' + secLabel(s) + '</span><span class="st">' + esc(s.title) + '</span><span class="pg">' + esc(s.page) + "頁" + (c.vols.length > 1 ? "・" + VOLNAME(s.vol) : "") + "</span></button>";
+      if (s.items && s.items.length) row += '<ol class="items">' + s.items.map(function (it) { return '<li><button class="irow" data-go="sec:' + it.id + '"><span class="sn">' + secLabel(it) + '</span><span class="st">' + esc(it.title) + '</span><span class="pg">' + esc(it.page) + "頁</span></button></li>"; }).join("") + "</ol>";
+      return row + "</li>";
+    }).join("") + "</ol>";
     return h;
   }
   function renderPanel() {
     var el = $("#pane-content"), h = "";
-    if (!sel) {
-      h = '<p class="crumb">總覽</p><h2>請選取念珠、文字或目次</h2>' +
-        "<p>拖曳可旋轉視角。點「見、修、行、果」隔珠或標籤，查看該區名相；點已配置的數珠，念珠會緩緩轉動並拉近，把它停在畫面中央；或切到「原書目次」按章瀏覽。左右切換只會在已配置內容的珠位間移動。</p>" +
-        '<h3>四個區段</h3><div class="chips">' + D.zones.map(function (zn) { return '<button class="chip zone-' + zn.id + '" data-go="zone:' + zn.idx + '">' + esc(zn.name) + " 區 <small>" + zn.first + "–" + zn.last + "</small></button>"; }).join("") + "</div>" +
-        '<h3>部件</h3><div class="chips">' + ["bead", "head", "tassel", "string"].map(function (k) { return '<button class="chip" data-go="part:' + k + '">' + esc(D.parts[k].title.replace(/（.*$/, "")) + "</button>"; }).join("") +
-        D.zones.map(function (zn) { return '<button class="chip" data-go="spacer:' + zn.idx + '">' + zn.spacerName + "・" + esc(zn.spacerTitle) + "</button>"; }).join("") + "</div>" +
-        '<div class="notice">環上 108 顆＝104 顆普通數珠＋4 顆隔珠（編號 27、54、81、108）；佛頭珠另計，與第四隔珠是不同部件。「見修行果」是本網站的導覽分類，不是引文原意。顏色較淺的珠子為待配置珠位。</div>';
-    } else if (sel.k === "bead") {
-      var b = BEADS[sel.n], zn = D.zones[b.z], t = termById[b.term];
-      h = zoneHead(zn) + "<h2>" + esc(t.name) + "</h2>" +
-        '<p class="pos">' + esc(zn.name) + "區 第 " + b.pos + "／26 珠 ・ 環上編號 " + sel.n + "／108 ・ 已配置 " + (zn.terms.indexOf(b.term) + 1) + "／" + zn.terms.length + " " + tag("nav") + "</p>";
-      h += "<h3>名相 " + tag("nav") + '</h3><div class="box">' + esc(t.name) + "</div>";
-      h += "<h3>所屬章（區段層級對應）</h3>" + chipsForChapters(zn.chapters);
-      h += '<div class="notice">此名相與各章、節、目的細部對應尚待確認。上列為「' + esc(zn.name) + "」區所列之主要對應章（" + esc(zn.mainNote) + "），不代表該名相出自每一章。</div>";
-      if (t.note) h += '<div class="notice">' + esc(t.note) + "</div>";
-      var others = ASSIGNED.filter(function (m) { return BEADS[m].term === b.term && m !== sel.n; });
-      if (others.length) h += '<h3>同一名相亦見於</h3><div class="chips">' + others.map(function (m) { return '<button class="chip" data-go="bead:' + m + '">' + esc(D.zones[BEADS[m].z].name) + "區 ・ 珠" + m + "</button>"; }).join("") + "</div>";
-      h += pendBlock();
-      h += '<p><button class="chip" data-go="zone:' + zn.idx + '">查看「' + esc(zn.name) + "」區全部名相</button></p>";
+    if (!sel && mode === "mala") {
+      h = '<p class="crumb">以數珠為喻 ・ 總覽</p><h2>以數珠為喻</h2><p class="guide">點選任一數珠可查看相關名相主題。</p>' +
+        "<p>點部件文字或念珠部件，可看導師引文中的對應譬喻；按「依四區查看名相」，念珠旁會改為標示見、修、行、果四區。上一珠／下一珠只在已配置名相的珠位間移動。</p>" +
+        "<h3>念珠部件與譬喻 " + tag("quote") + '</h3><ul class="parts">' + PART_KEYS.map(function (k) { var p = D.parts[k]; return '<li><button class="prow" data-go="part:' + k + '"><b>' + esc(p.title) + "</b><span>" + esc(p.text) + "</span></button></li>"; }).join("") + "</ul>" +
+        '<h3>見修行果四區 ' + tag("nav") + '</h3><div class="chips">' + D.zones.map(function (zn) { return chip("zone:" + zn.idx, esc(zn.name) + " 區 <small>" + zn.first + "–" + zn.last + "</small>", "zone-" + zn.id); }).join("") + "</div>" +
+        '<div class="notice">環上 108 顆＝104 顆普通數珠＋4 顆隔珠（編號 27、54、81、108）；佛頭珠另計，與第四隔珠是不同部件。「見修行果」是本網站的導覽分類，不是引文原意；引文原本說「以風瑜伽為隔珠」。目前 76 個名相各占一個主珠位，為初始可調整配置，其餘 28 顆待配置；顏色較淺的珠子為待配置珠位。</div>';
+    } else if (!sel && mode === "book") {
+      h = '<p class="crumb">原書導讀 ・ 總覽</p><h2>原書導讀</h2><p class="guide">點選念珠上的章名或任一章，可分層查看節、目與頁碼。</p>' +
+        "<p>全書四輯十七章，一章對應一顆數珠，不分見修行果。上一章／下一章只在 17 個章入口間移動；章內的節以「前一批／後一批」換頁。</p>" +
+        '<ol class="chlist">' + D.chapters.map(function (c) { return '<li><button class="srow" data-go="chapter:' + c.id + '"><span class="sn">' + chLabel(c) + '</span><span class="st">' + esc(c.title) + '</span><span class="pg">' + c.sections.length + "節</span></button></li>"; }).join("") + "</ol>" +
+        "<h3>其他目次入口 " + tag("book") + '</h3><div class="chips">' + D.extras.map(function (x) { return chip("extra:" + x.id, esc(x.title) + (x.vol ? " <small>" + VOLNAME(x.vol) + "</small>" : "")); }).join("") + "</div>";
+    } else if (sel.k === "bead" || sel.k === "empty") {
+      var b = BEADS[sel.n], zn = D.zones[b.z];
+      if (!b.term) {
+        h = zoneHead(zn) + "<h2>待配置珠位</h2>" + '<p class="pos">' + esc(zn.name) + "區 第 " + b.pos + "／26 珠 ・ 環上編號 " + sel.n + "／108</p>" +
+          '<p class="pend">此珠位尚未配置名相，內容待補。</p>' + '<p>' + chip("zone:" + zn.idx, "查看「" + esc(zn.name) + "」區已配置名相") + "</p>";
+      } else {
+        var t = termById[b.term], idx = termsOfZone(b.z).filter(function (x) { return x.group === t.group; }).indexOf(t) + 1;
+        h = zoneHead(zn) + "<h2>" + esc(t.name) + "</h2>" +
+          '<p class="pos">' + esc(zn.name) + "區 第 " + b.pos + "／26 珠 ・ 環上編號 " + sel.n + "／108 ・ 本區第 " + idx + " 個名相 " + tag("nav") + "</p>";
+        if (t.show.length > 1) h += '<div class="notice">主珠位在「' + esc(t.group) + "」區；亦可於「" + esc(t.show.filter(function (g) { return g !== t.group; }).join("、")) + "」區顯示，指向同一份內容，不另占珠位。</div>";
+        if (t.notes.length) h += '<h3>子名相・校訂註</h3><ul class="notes">' + t.notes.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ul>";
+        h += "<h3>相關章節與頁碼 " + tag("book") + "</h3>" + refList(t.refs) +
+          '<p class="pend small">〔直接〕詞語出現在該節／目標題；〔關聯〕為分類或合併上的關聯；〔僅章題〕僅章名出現。此為目次標題對照，不是正文逐字索引。</p>';
+        h += pendBlock(t);
+      }
     } else if (sel.k === "spacer" || sel.k === "zone") {
       var z2 = D.zones[sel.z];
       if (sel.k === "spacer") {
         h = zoneHead(z2) + "<h2>" + z2.spacerName + "：" + esc(z2.spacerTitle) + "</h2>" +
-          '<p class="pos">環上編號 ' + z2.spacerNo + "／108 ・ 代表其前 26 顆普通數珠（" + z2.first + "–" + z2.last + "）</p>";
+          '<p class="pos">環上編號 ' + z2.spacerNo + "／108 ・ 隔開其前 26 顆普通數珠（" + z2.first + "–" + z2.last + "）</p>";
         h += "<h3>原文的隔珠譬喻 " + tag("quote") + '</h3><div class="box">以風瑜伽為隔珠</div>';
         h += '<div class="notice">引文原本只說「以風瑜伽為隔珠」。將四顆隔珠分別設為「見、修、行、果」，是本網站的導覽安排，並非引文本身的說法。' + (sel.z === 1 ? "（第二隔珠標示「修（風瑜伽）」，與原文的風瑜伽相呼應。）" : "") + "</div>";
       } else h = zoneHead(z2) + "<h2>" + esc(z2.name) + "　區</h2>";
       h += zoneBody(z2);
     } else if (sel.k === "part") {
-      var pt0 = D.parts[sel.id];
-      h = '<p class="crumb">念珠部件</p><h2>' + esc(pt0.title) + "</h2><h3>譬喻 " + tag(pt0.src) + '</h3><div class="box">' + esc(pt0.text) + "</div>";
-      if (sel.id === "bead") h += '<p>環上共 108 顆：104 顆普通數珠＋4 顆隔珠。每 26 顆普通數珠之後接 1 顆隔珠。普通數珠上的名相配置見四區說明。</p><div class="chips">' + D.zones.map(function (zn) { return '<button class="chip" data-go="zone:' + zn.idx + '">' + esc(zn.name) + " 區 " + zn.first + "–" + zn.last + "</button>"; }).join("") + "</div>";
+      var pt = D.parts[sel.id];
+      h = '<p class="crumb">以數珠為喻 ・ 念珠部件</p><h2>' + esc(pt.title) + ' <small class="cnt">' + esc(pt.count) + "</small></h2><h3>譬喻 " + tag("quote") + '</h3><div class="box big">' + esc(pt.text) + "</div>";
+      if (sel.id === "bead") h += '<p>環上共 108 顆：104 顆普通數珠＋4 顆隔珠。每 26 顆普通數珠之後接 1 顆隔珠。</p><div class="chips">' + D.zones.map(function (zn) { return chip("zone:" + zn.idx, esc(zn.name) + " 區 " + zn.first + "–" + zn.last); }).join("") + "</div>";
+      if (sel.id === "spacer") h += '<div class="notice">四顆隔珠在環上第 27、54、81、108 顆。本站另以四隔珠標示「見、修、行、果」四區，這是導覽安排，不是引文原意。</div><div class="chips">' + D.zones.map(function (zn) { return chip("spacer:" + zn.idx, zn.spacerName + "・" + esc(zn.spacerTitle)); }).join("") + "</div>";
       if (sel.id === "head") h += '<div class="notice">佛頭珠位於第四隔珠（環上第 108 顆）上方，是另計的 1 顆，不可與第四隔珠合併。</div>';
+      if (sel.id === "tassel") h += '<div class="notice">飾穗繫於佛頭珠尾端，為佛頭珠所懸。</div>';
       if (sel.id === "string") h += '<div class="notice">串繩連續貫穿環上 108 顆珠子。</div>';
-      h += '<p class="pend">此為引文中的譬喻說明；進一步解說待補。</p>';
-    } else if (sel.k === "chapter") {
-      var c = chById[sel.id], zs = zonesOfChapter(c.id);
-      h = '<p class="crumb">原書目次 ・ 第 ' + c.no + " 章 " + tag("book") + "</p><h2>第" + c.no + "章 " + esc(c.title) + "</h2>";
-      if (c.volumes) h += '<p class="pos">' + esc(c.volumes) + "</p>";
-      h += "<h3>節、目、頁碼 " + tag("book") + "</h3>";
-      if (c.sections) {
-        h += '<ul class="toc" style="margin:0">' + c.sections.map(function (s) { return '<li class="sub" style="padding-left:0;color:var(--fg)">' + esc(s.no) + " " + esc(s.title) + '　<small class="pend">' + esc(s.volume) + "；頁碼待補</small></li>"; }).join("") + "</ul>";
-        h += '<p class="pend" style="font-size:.88rem">其餘節、目及頁碼待補，不猜補。第七章第三節跨輯接續：上半在第一輯、下半在第二輯，各保留原題名。</p>';
-      } else if (c.volumeNote) h += "<p>" + esc(c.volumeNote) + "</p>";
-      else h += '<p class="pend">本章的節、目與頁碼待補（尚未提供）。</p>';
-      h += "<h3>所屬分類 " + tag("nav") + "</h3>";
-      if (zs.length) {
-        h += '<div class="chips">' + zs.map(function (zn) { var part = zn.chapters.filter(function (x) { return x.id === c.id; })[0].partial; return '<button class="chip zone-' + zn.id + '" data-go="zone:' + zn.idx + '">' + esc(zn.name) + "區" + (part ? " <small>（部分內容）</small>" : "") + "</button>"; }).join("") + "</div>";
-        h += '<div class="notice">念珠上已高亮這些區段中已配置的珠位。分類為章層級對應，節級對應待確認。</div>';
-      } else h += '<p class="pend">此章尚未配置到「見修行果」珠位（待確認），仍可由目次進入。</p>';
-      h += pendBlock();
+      h += '<p class="pend">此為引文中的譬喻；進一步解說待補。</p>';
+    } else if (sel.k === "chapter" || sel.k === "sec") {
+      var s = sel.k === "sec" ? secById[sel.id] : null, c = chById[s ? s.ch : sel.id], parent = s && s.parent ? secById[s.parent] : null;
+      h = '<p class="crumb">原書導讀 ・ ' + chLabel(c) + " ・ " + volText(c.vols) + " " + tag("book") + '</p><h2 class="chh">' + chLabel(c) + "　" + esc(c.title) + "</h2>";
+      if (c.no === 7) h += '<div class="notice">第七章跨第一、二輯：第三節「應成派中觀之般若見」上半在第一輯、下半在第二輯，同屬一節。</div>';
+      if (c.no === 9) h += '<div class="notice">第九章跨第二、三輯：第二輯含第一至第六節，第三輯接續第七至第十一節，同屬一章。</div>';
+      if (s) {
+        h += '<div class="secfocus"><p class="crumb">' + (parent ? secLabel(parent) + " " + esc(parent.title) + " ・ " : "") + secLabel(s) + "</p><h3 class=\"sech\">" + esc(s.title) + '</h3><p class="pos">原書頁碼 ' + esc(s.page) + " 頁 ・ " + VOLNAME(s.vol) + "</p>";
+        if (s.items && s.items.length) h += '<ol class="items open">' + s.items.map(function (it) { return '<li><button class="irow" data-go="sec:' + it.id + '"><span class="sn">' + secLabel(it) + '</span><span class="st">' + esc(it.title) + '</span><span class="pg">' + esc(it.page) + "頁</span></button></li>"; }).join("") + "</ol>";
+        var rel = termsOfSec(s.id);
+        if (rel.length) h += "<h3>相關名相 " + tag("nav") + '</h3><div class="chips">' + rel.map(function (t) { return chip("bead:" + t.slot, esc(t.name) + " <small>" + esc(t.group) + "區</small>"); }).join("") + "</div>";
+        h += pendBlock(s);
+        h += '<p><button class="chip" data-go="chapter:' + c.id + '">‹ 回到本章節次</button></p></div>';
+      } else {
+        h += chapterBody(c, null);
+        var rt = termsOfChapter(c.id);
+        if (rt.length) h += "<h3>本章相關名相 " + tag("nav") + '</h3><div class="chips">' + rt.map(function (t) { return chip("bead:" + t.slot, esc(t.name) + " <small>" + esc(t.group) + "區</small>"); }).join("") + "</div>";
+        else h += '<p class="pend small">本章目前沒有對應的名相主珠位，以章節模式完整閱讀。</p>';
+        h += pendBlock(c);
+      }
     } else if (sel.k === "extra") {
       var x = extraById[sel.id];
-      h = '<p class="crumb">原書目次入口 ' + tag("book") + "</p><h2>" + esc(x.title) + '</h2><p class="pend">目前僅有目次入口；內容與頁碼待補。</p>';
+      h = '<p class="crumb">原書導讀 ・ 其他目次入口 ' + tag("book") + "</p><h2>" + esc(x.title) + '</h2><p class="pos">' + (x.vol ? VOLNAME(x.vol) + " ・ " : "") + "頁碼 " + esc(x.page || "待補") + '</p><p class="pend">目前僅有目次入口；內容待補。</p>';
     }
     el.innerHTML = h;
     el.scrollTop = 0;
   }
 
-  /* ---------- 目次 ---------- */
+  /* ---------- 純文字目次（3D 失效時仍可完整閱讀） ---------- */
   function buildToc() {
-    var h = '<p class="pend" style="font-size:.88rem;margin-top:0">已提供的章名皆列於此；各章的輯別、節、目、頁碼待補，未提供者不猜補。圓點為本站導覽分類。</p><ul class="toc">';
+    var h = '<p class="pend small" style="margin-top:0">四輯十七章完整目次（章 17、節 159、目 21；第七章第三節分上下半）。點任一列可在念珠上定位並展開。</p>';
+    var vol = 0;
     D.chapters.forEach(function (c) {
-      var zs = zonesOfChapter(c.id);
-      h += '<li><button class="row" data-go="chapter:' + c.id + '"><span class="n">' + c.no + "</span><span>" + esc(c.title) + '</span><span class="dots">' +
-        zs.map(function (zn) { return '<b style="background:' + ZCOLOR[zn.id] + '" title="' + zn.name + '">' + zn.name + "</b>"; }).join("") + "</span></button>";
-      if (c.volumes) h += '<div class="sub" style="padding-bottom:4px">' + esc(c.volumes) + "</div>";
-      if (c.sections) h += c.sections.map(function (s) { return '<div class="sub">' + esc(s.no) + " " + esc(s.title) + "（" + esc(s.volume) + "）</div>"; }).join("");
-      if (c.volumeNote) h += '<div class="sub">' + esc(c.volumeNote) + "</div>";
-      h += "</li>";
+      if (c.vols[0] !== vol) { vol = c.vols[0]; h += "<h4>" + VOLNAME(vol) + "</h4>"; }
+      h += '<details class="tocch" data-ch="' + c.id + '"><summary><button class="row" data-go="chapter:' + c.id + '"><span class="n">' + c.no + "</span><span>" + esc(c.title) + '</span><span class="cnt">' + c.sections.length + "節</span></button></summary><ol>" +
+        c.sections.map(function (s) {
+          return '<li><button class="trow" data-go="sec:' + s.id + '"><span>' + secLabel(s) + " " + esc(s.title) + "</span><i>" + esc(s.page) + (c.vols.length > 1 ? "・" + VOLNAME(s.vol) : "") + "</i></button>" +
+            (s.items ? '<ol class="ti">' + s.items.map(function (it) { return '<li><button class="trow" data-go="sec:' + it.id + '"><span>' + secLabel(it) + " " + esc(it.title) + "</span><i>" + esc(it.page) + "</i></button></li>"; }).join("") + "</ol>" : "") + "</li>";
+        }).join("") + "</ol></details>";
     });
-    h += '</ul><h4>其他目次入口</h4><ul class="toc">' + D.extras.map(function (x) { return '<li><button class="row" data-go="extra:' + x.id + '"><span>' + esc(x.title) + '</span><span class="dots pend">待補</span></button></li>'; }).join("") + "</ul>";
+    h += '<h4>其他目次入口</h4><ul class="toc">' + D.extras.map(function (x) { return '<li><button class="trow" data-go="extra:' + x.id + '"><span>' + esc(x.title) + (x.vol ? "（" + VOLNAME(x.vol) + "）" : "") + "</span><i>" + esc(x.page) + "</i></button></li>"; }).join("") + "</ul>";
     $("#pane-toc").innerHTML = h;
-    $("#chsel").innerHTML = '<option value="">— 選擇章節 —</option>' + D.chapters.map(function (c) { return '<option value="chapter:' + c.id + '">第' + c.no + "章 " + esc(c.title) + "</option>"; }).join("") +
-      D.extras.map(function (x) { return '<option value="extra:' + x.id + '">' + esc(x.title) + "</option>"; }).join("");
+    $("#chsel").innerHTML = '<option value="">— 選擇章節 —</option>' + D.chapters.map(function (c) { return '<option value="chapter:' + c.id + '">' + chLabel(c) + " " + esc(c.title) + "</option>"; }).join("") +
+      D.extras.map(function (x) { return '<option value="extra:' + x.id + '">' + esc(x.title) + (x.vol ? "（" + VOLNAME(x.vol) + "）" : "") + "</option>"; }).join("");
   }
   function syncToc() {
-    document.querySelectorAll("#pane-toc .row").forEach(function (b) {
-      b.classList.toggle("on", !!(sel && (sel.k === "chapter" || sel.k === "extra") && b.getAttribute("data-go") === sel.k + ":" + sel.id));
+    var cid = sel && sel.k === "chapter" ? sel.id : sel && sel.k === "sec" ? secById[sel.id].ch : null;
+    document.querySelectorAll("#pane-toc [data-go]").forEach(function (b) {
+      var a = b.getAttribute("data-go");
+      b.classList.toggle("on", !!(sel && (a === sel.k + ":" + (sel.id))));
     });
-    $("#chsel").value = sel && (sel.k === "chapter" || sel.k === "extra") ? sel.k + ":" + sel.id : "";
+    document.querySelectorAll("#pane-toc details").forEach(function (d) { if (d.getAttribute("data-ch") === cid) d.open = true; });
+    $("#chsel").value = cid ? "chapter:" + cid : sel && sel.k === "extra" ? "extra:" + sel.id : "";
   }
   function showTab(name) {
     var c = name === "content";
@@ -158,19 +285,24 @@
   /* ---------- 導覽 ---------- */
   function go(str, opt) {
     var a = parseAct(str), v = a.v;
-    if (a.k === "bead") { if (BEADS[+v] && BEADS[+v].term) select({ k: "bead", n: +v }, opt); }
+    if (a.k === "bead" || a.k === "empty") { var b = BEADS[+v]; if (b && !b.spacer) select({ k: b.term ? "bead" : "empty", n: +v }, opt); else if (b) select({ k: "spacer", z: b.z }, opt); }
     else if (a.k === "spacer") select({ k: "spacer", z: +v }, opt);
     else if (a.k === "zone") select({ k: "zone", z: +v }, opt);
     else if (a.k === "part") { if (D.parts[v]) select({ k: "part", id: v }, opt); }
     else if (a.k === "chapter") { if (chById[v]) select({ k: "chapter", id: v }, opt); }
+    else if (a.k === "sec") { if (secById[v]) select({ k: "sec", id: v }, opt); }
     else if (a.k === "extra") { if (extraById[v]) select({ k: "extra", id: v }, opt); }
   }
   function step(d) {
+    if (mode === "book") {
+      var cid = sel && sel.k === "chapter" ? sel.id : sel && sel.k === "sec" ? secById[sel.id].ch : null, i = CH_ORDER.indexOf(cid);
+      i = i < 0 ? (d > 0 ? 0 : CH_ORDER.length - 1) : (i + d + CH_ORDER.length) % CH_ORDER.length;
+      select({ k: "chapter", id: CH_ORDER[i] }); return;
+    }
     var cur;
-    if (sel && sel.k === "bead") cur = sel.n;
+    if (sel && (sel.k === "bead" || sel.k === "empty")) cur = sel.n;
     else if (sel && sel.k === "spacer") cur = D.zones[sel.z].spacerNo;
     else if (sel && sel.k === "zone") cur = D.zones[sel.z].first - 0.5;
-    else if (sel && sel.k === "chapter") { var zs = zonesOfChapter(sel.id); cur = zs.length ? zs[0].first - 0.5 : lastBead; }
     else cur = lastBead || (d > 0 ? 0 : 109);
     var pick;
     if (d > 0) { pick = ASSIGNED.filter(function (m) { return m > cur; })[0]; if (!pick) pick = ASSIGNED[0]; }
@@ -178,19 +310,36 @@
     select({ k: "bead", n: pick });
   }
 
+  /* ---------- 引文：先顯示開頭，點選展開全文與署名 ---------- */
+  function initQuote() {
+    var q = D.quote, cut = q.indexOf("為數珠") + 3, box = $("#main-quote"), p = $("#quote"), btn = $("#quote-toggle");
+    var open = false;
+    function draw() {
+      p.textContent = open ? q : q.slice(0, cut) + "⋯⋯";
+      btn.textContent = open ? "收合引文" : "展開完整引文與署名";
+      btn.setAttribute("aria-expanded", open); box.classList.toggle("open", open);
+    }
+    btn.onclick = function () { open = !open; draw(); };
+    $("#quote-full").textContent = q; // 供搜尋、無障礙及測試的完整原文
+    draw();
+  }
+
   function init() {
-    $("#quote").textContent = D.quote;
+    initQuote();
     buildToc();
-    $("#partbar").innerHTML = ["bead", "head", "tassel", "string"].map(function (kk) { return '<button type="button" data-go="part:' + kk + '">' + esc(D.parts[kk].title.replace(/（.*$/, "")) + "說明</button>"; }).join("") +
-      D.zones.map(function (zn) { return '<button type="button" data-go="spacer:' + zn.idx + '">' + zn.spacerName + "・" + esc(zn.spacerTitle) + "</button>"; }).join("");
-    renderPanel();
+    $("#partbar").innerHTML = PART_KEYS.map(function (kk) { return '<button type="button" data-go="part:' + kk + '">' + esc(D.parts[kk].title) + "</button>"; }).join("") +
+      D.zones.map(function (zn) { return '<button type="button" class="mala-only" data-go="spacer:' + zn.idx + '">' + zn.spacerName + "・" + esc(zn.spacerTitle) + "</button>"; }).join("");
     try { has3D = !!(window.THREE && window.KM3D && window.KM3D.init(KM)); } catch (e) { console.error(e); has3D = false; }
     if (!has3D) {
       $("#gl-fail").hidden = false;
       var l = $("#loading"); if (l) l.style.display = "none";
     }
+    setMode("mala", true); renderPanel(); syncNav();
     document.addEventListener("click", function (e) {
+      var bt = e.target.closest("[data-batch]");
+      if (bt) { var pr = bt.getAttribute("data-batch").split(":"); batch[pr[0]] = (batch[pr[0]] || 0) + (+pr[1]) * batchSize(); renderPanel(); return; }
       var t = e.target.closest("[data-go]"); if (!t) return;
+      if (t.closest("summary")) e.preventDefault();
       go(t.getAttribute("data-go"));
     });
     document.addEventListener("keydown", function (e) {
@@ -202,6 +351,9 @@
     $("#prev").onclick = function () { step(-1); };
     $("#next").onclick = function () { step(1); };
     $("#home").onclick = function () { select(null); };
+    $("#mode-mala").onclick = function () { setMode("mala"); };
+    $("#mode-book").onclick = function () { setMode("book"); };
+    $("#zoneview").onclick = function () { if (sel) select(null); setZoneView(!zoneView); };
     $("#chsel").onchange = function (e) { if (e.target.value) go(e.target.value); };
     $("#tab-content").onclick = function () { showTab("content"); };
     $("#tab-toc").onclick = function () { showTab("toc"); };
@@ -211,10 +363,14 @@
     if (reduce) setMotion(true);
     var lb = $("#lines"), on = true;
     lb.onclick = function () { on = !on; if (has3D) KM3D.setLines(on); lb.setAttribute("aria-pressed", on); lb.textContent = on ? "引線：開" : "引線：關"; };
-    var m = /^#(bead|spacer|zone|part|ch|x)-(.+)$/.exec(location.hash);
+    narrowMQ.addEventListener && narrowMQ.addEventListener("change", function () { batch = {}; renderPanel(); });
+    var m = /^#(bead|spacer|zone|part|ch|sec|x|book)-?(.*)$/.exec(location.hash);
     if (m) {
-      var kk = { ch: "chapter", x: "extra" }[m[1]] || m[1], v = kk === "extra" ? "x-" + m[2] : m[2];
-      setTimeout(function () { go(kk + ":" + v, { hash: false }); }, 300);
+      setTimeout(function () {
+        if (m[1] === "book") { setMode("book"); return; }
+        var kk = { ch: "chapter", x: "extra" }[m[1]] || m[1];
+        go(kk + ":" + decodeURIComponent(m[2]), { hash: false });
+      }, 300);
     }
   }
   init();

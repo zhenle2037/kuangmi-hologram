@@ -8,7 +8,7 @@
   var GY = 1.85, R = 26, TAU = Math.PI * 2, FOV = 45, ZC = [0x6fe3f0, 0xffd27a, 0xc9a8ff, 0xff8f9d];
   var W = 1, H = 1, narrow = false, offX = 0, offY = 0;
   var beads = [], guru, tassel, stringMesh, ringLocal = [];
-  var paused = false, reduce = false, lines = true, selected = null, focused = false;
+  var paused = false, reduce = false, lines = true, selected = null, focused = false, mode = "mala", labelSet = "parts";
   var hover = null, down = null, userDrag = false, spinV = 0, bobAmp = 1, tt = 0, rotTween = null, built = false;
   var labelDefs = [], labelEls = [], fanEls = [], leaderPaths = {};
   var leaders, labelsBox, calloutEl, fanBox, mainLeader, crosshair, quoteEl;
@@ -98,7 +98,7 @@
       var o = { n: n, grp: grp, core: core, wire: wire, glow: glow, spacer: b.spacer, z: b.z, assigned: !!b.term, r: (b.spacer ? RS : RB) * 1.08,
         cur: { op: 0.85, em: 0.5, wo: 0.35, go: 0.35 }, tgt: { op: 0.85, em: 0.5, wo: 0.35, go: 0.35 }, sc: 1 };
       beads[n] = o;
-      if (b.term || b.spacer) cands.push({ act: b.spacer ? "spacer:" + b.z : "bead:" + n, obj: grp, rad: b.spacer ? 1.05 : 0.9, bead: o });
+      cands.push({ obj: grp, rad: b.spacer ? 1.05 : 0.9, bead: o });
     }
     // 串繩（連續圓環，貫穿所有珠心）
     stringMesh = new T.Mesh(new T.TorusGeometry(R, 0.06, 8, 256), new T.MeshStandardMaterial({ color: 0xb0302c, roughness: 0.6 }));
@@ -127,20 +127,30 @@
 
   /* ---------- 文字入口（螢幕座標的 HTML 標籤＋引線） ---------- */
   function buildLabels() {
-    function add(id, act, text, anchor, mode, off) { labelDefs.push({ id: id, act: act, text: text, anchor: anchor, mode: mode, off: off }); }
+    var set = "parts";
+    function add(id, act, text, anchor, mode, off, html) { labelDefs.push({ id: id, act: act, text: text, anchor: anchor, mode: mode, off: off, set: set, html: html }); }
+    function partHtml(k) { var p = KM.partText(k); return "<b>" + KM.esc(p.title) + "</b><span>" + KM.esc(p.text) + "</span>"; }
     var ringPt = function (n) { return function (out) { var th = TAU * n / 108; return out.set(Math.sin(th) * R, 0, Math.cos(th) * R); }; };
     var obj = function (o, dy) { return function (out) { o.getWorldPosition(out); out.y += dy || 0; return out; }; };
     var world = function (fn) { return function (out) { fn(out); return malaGroup.localToWorld(out); }; };
-    add("head", "part:head", "佛頭珠", function (out) { return guru.getWorldPosition(out); }, "out", 44);
-    add("tassel", "part:tassel", "佛頭珠飾穗", function (out) { tassel.getWorldPosition(out); out.y += 1.6; return out; }, "out", 44);
+    // 部件譬喻（預設）：五種部件，文字與引文一致
+    add("head", "part:head", "佛頭珠", function (out) { return guru.getWorldPosition(out); }, "out", 44, partHtml("head"));
+    add("tassel", "part:tassel", "飾穗", function (out) { tassel.getWorldPosition(out); out.y += 1.6; return out; }, "out", 44, partHtml("tassel"));
+    add("pbead", "part:bead", "數珠", world(ringPt(34)), "out", 46, partHtml("bead"));
+    add("pspacer", "part:spacer", "隔珠", world(ringPt(81)), "out", 44, partHtml("spacer"));
+    add("string", "part:string", "串繩", world(ringPt(67.5)), "in", 90, partHtml("string"));
+    // 依四區查看名相
+    set = "zones";
+    add("head2", "part:head", "佛頭珠", function (out) { return guru.getWorldPosition(out); }, "out", 44);
     D.zones.forEach(function (zn, zi) {
       add("sp" + zi, "spacer:" + zi, "隔珠" + "一二三四".charAt(zi) + "・" + zn.name, world(ringPt(zn.spacerNo)), "out", 40);
       add("zn" + zi, "zone:" + zi, zn.name + " " + zn.first + "–" + zn.last, world(ringPt(zi * 27 + 13.5)), "out", 52);
     });
-    add("bead", "part:bead", "普通數珠 104 顆", world(ringPt(40)), "in", 80);
-    add("string", "part:string", "串繩", world(ringPt(67.5)), "in", 80);
+    // 原書導讀：17 章各一顆
+    set = "book";
+    D.chapters.forEach(function (c) { add("ch" + c.no, "chapter:" + c.id, KM.chLabel(c) + " " + KM.shortTitle(c.title), world(ringPt(KM.CH_BEAD[c.id])), "out", 26); });
     labelDefs.forEach(function (d) {
-      var b = document.createElement("button"); b.type = "button"; b.className = "lab"; b.textContent = d.text; b.setAttribute("data-act", d.act); b.setAttribute("aria-label", d.text);
+      var b = document.createElement("button"); b.type = "button"; b.className = "lab lab-" + d.set + (d.html ? " lab-part" : ""); if (d.html) b.innerHTML = d.html; else b.textContent = d.text; b.setAttribute("data-act", d.act); b.setAttribute("aria-label", d.text);
       b.addEventListener("click", function () { KM.go(d.act); });
       labelsBox.appendChild(b); d.el = b;
       var p = document.createElementNS("http://www.w3.org/2000/svg", "path"); leaders.appendChild(p); d.path = p;
@@ -174,10 +184,14 @@
       if (s.k === "bead") { zone = KM.BEADS[s.n].z; selN = s.n; }
       else if (s.k === "spacer") { zone = s.z; selN = D.zones[s.z].spacerNo; }
       else if (s.k === "zone") zone = s.z;
-      else if (s.k === "chapter") { chSet = {}; KM.zonesOfChapter(s.id).forEach(function (zn) { zn.terms.forEach(function (_, i) { chSet[zn.first + i] = 1; }); }); }
     }
+    var book = mode === "book";
+    if (s && (s.k === "chapter" || s.k === "sec")) { selN = KM.CH_BEAD[s.k === "chapter" ? s.id : KM.secById[s.id].ch]; chSet = null; }
+    if (s && s.k === "empty") { zone = KM.BEADS[s.n].z; selN = s.n; }
     for (var n = 1; n <= 108; n++) {
       var b = beads[n], t = b.tgt;
+      b.assigned = book ? !!KM.BEADS[n].ch : !!KM.BEADS[n].term;
+      if (!b.spacer) b.core.material.color.setHex(b.assigned ? (book ? 0xdcc39a : 0xe2cba6) : 0xf2ece2);
       if (b.spacer) { t.op = 1; t.em = 0.6; t.wo = 0; t.go = 0; }
       else if (b.assigned) { t.op = 1; t.em = 0.6; t.wo = 0; t.go = 0; }
       else { t.op = 1; t.em = 0.6; t.wo = 0; t.go = 0; }
@@ -200,20 +214,28 @@
   }
 
   /* ---------- 選取 → 轉動與飛近 ---------- */
-  var FOCUS_KINDS = { bead: 1, spacer: 1, zone: 1 };
+  var FOCUS_KINDS = { bead: 1, empty: 1, spacer: 1, zone: 1, chapter: 1, sec: 1 };
+  function focusBead(s) {
+    if (!s) return 0;
+    if (s.k === "bead" || s.k === "empty") return s.n;
+    if (s.k === "spacer") return D.zones[s.z].spacerNo;
+    if (s.k === "chapter") return KM.CH_BEAD[s.id];
+    if (s.k === "sec") return KM.CH_BEAD[KM.secById[s.id].ch];
+    return 0;
+  }
   API.setSelection = function (sel) {
     if (!built) return;
     var prev = selected; selected = sel;
     focused = !!sel && (FOCUS_KINDS[sel.k] || (sel.k === "part" && (sel.id === "head" || sel.id === "tassel")));
     applyTargets();
-    scaleFor(prev, 1); if (sel && (sel.k === "bead" || sel.k === "spacer")) scaleFor(sel, 1.3);
+    scaleFor(prev, 1); if (focusBead(sel)) scaleFor(sel, 1.3);
     var dur = reduce ? 0.01 : 1.9, camTo, tgtTo, rotTo = null;
     var f = Math.max(1, 1.45 / aEff());
-    if (sel && sel.k === "bead") rotTo = -TAU * sel.n / 108;
-    else if (sel && sel.k === "spacer") rotTo = -TAU * D.zones[sel.z].spacerNo / 108;
+    var fb = focusBead(sel);
+    if (fb) rotTo = -TAU * fb / 108;
     else if (sel && sel.k === "zone") rotTo = -TAU * (D.zones[sel.z].first + 13) / 108;
     else if (sel && sel.k === "part" && (sel.id === "head" || sel.id === "tassel")) rotTo = 0;
-    if (sel && (sel.k === "bead" || sel.k === "spacer")) { camTo = new T.Vector3(0, 6.5, R + 13); tgtTo = new T.Vector3(0, 0, R); }
+    if (fb) { camTo = new T.Vector3(0, 6.5, R + 13); tgtTo = new T.Vector3(0, 0, R); }
     else if (sel && sel.k === "zone") { camTo = new T.Vector3(0, 16 * f, R + 28 * f); tgtTo = new T.Vector3(0, 0, R - 5); }
     else if (sel && sel.k === "part" && (sel.id === "head" || sel.id === "tassel")) { camTo = new T.Vector3(0, 9, R + 17); tgtTo = new T.Vector3(0, 3, R); }
     else { camTo = overviewPos(); tgtTo = new T.Vector3(0, 0, 0); }
@@ -227,8 +249,7 @@
     buildFocusUI();
   };
   function scaleFor(s, v) {
-    if (!s || (s.k !== "bead" && s.k !== "spacer")) return;
-    var n = s.k === "bead" ? s.n : D.zones[s.z].spacerNo;
+    var n = focusBead(s); if (!n) return;
     G.to(beads[n].grp.scale, { x: v, y: v, z: v, duration: v > 1 ? 1 : 0.5, ease: v > 1 ? "elastic.out(1,0.4)" : "power2.out" });
   }
 
@@ -237,18 +258,19 @@
   function buildFocusUI() {
     fanBox.innerHTML = ""; fanPaths.forEach(function (p) { p.remove(); }); fanPaths = []; fanItems = []; selInfo = null;
     calloutEl.classList.remove("on"); mainLeader.style.opacity = 0;
-    var s = selected; if (!s || (s.k !== "bead" && s.k !== "spacer")) return;
-    var n, zn, name, sub;
-    if (s.k === "bead") { var b = KM.BEADS[s.n]; n = s.n; zn = D.zones[b.z]; name = KM.termById[b.term].name; sub = zn.name + "區 第 " + b.pos + "／26 珠 ・ 環上 " + n + "／108"; }
-    else { zn = D.zones[s.z]; n = zn.spacerNo; name = "隔珠" + "一二三四".charAt(s.z) + "：" + zn.spacerTitle; sub = "環上 " + n + "／108 ・ 代表其前 26 顆數珠"; }
-    calloutEl.innerHTML = "<b>" + KM.esc(name) + "</b><small>" + KM.esc(sub) + "</small>";
-    selInfo = { n: n };
+    var info = KM.focusInfo(selected); if (!info) return;
+    calloutEl.innerHTML = "<b>" + KM.esc(info.name) + "</b><small>" + KM.esc(info.sub) + "</small>";
+    selInfo = { n: info.n, nb: [] };
     var cp = document.createElementNS("http://www.w3.org/2000/svg", "path"); leaders.appendChild(cp); selInfo.cpath = cp; fanPaths.push(cp);
+    info.neighbors.forEach(function (nb) { // 相鄰珠的名稱（只顯示標題）
+      var e = document.createElement("button"); e.type = "button"; e.className = "nb"; e.textContent = nb.text; e.setAttribute("aria-label", nb.text);
+      e.addEventListener("click", function () { var a = KM.actForBead(nb.n); if (a) KM.go(a); });
+      fanBox.appendChild(e); selInfo.nb.push({ n: nb.n, el: e });
+    });
     if (narrow) return;
-    zn.chapters.forEach(function (c) {
-      var ch = KM.chById[c.id], t = "第" + ch.no + "章 " + ch.title + (c.partial ? "（部分內容）" : "");
-      var b2 = document.createElement("button"); b2.type = "button"; b2.className = "fl"; b2.textContent = t; b2.setAttribute("aria-label", t);
-      b2.addEventListener("click", function () { KM.go("chapter:" + ch.id); });
+    info.fan.slice(0, 5).forEach(function (f) {
+      var b2 = document.createElement("button"); b2.type = "button"; b2.className = "fl"; b2.textContent = f.text; b2.setAttribute("aria-label", f.text);
+      b2.addEventListener("click", function () { KM.go(f.act); });
       fanBox.appendChild(b2);
       var p = document.createElementNS("http://www.w3.org/2000/svg", "path"); leaders.appendChild(p); fanPaths.push(p);
       fanItems.push({ el: b2, path: p });
@@ -259,12 +281,19 @@
     var o = toScreen(tmp.set(0, 0, 0)), ctr = { x: o.x, y: o.y };
     if (!narrow && !focused) {
       labelDefs.forEach(function (d) {
+        if (d.set !== labelSet) { d.el.style.display = "none"; d.path.style.display = "none"; return; }
+        d.el.style.display = "";
         d.anchor(tmp); var a = toScreen(tmp), dx = a.x - ctr.x, dy = a.y - ctr.y, m = Math.hypot(dx, dy) || 1; dx /= m; dy /= m;
         if (d.mode === "in") { dx = -dx; dy = -dy; }
-        if (d.id === "head" || d.id === "tassel") { dx = d.id === "head" ? -1 : 1; dy = d.id === "head" ? 0.1 : -0.15; }
+        if (d.id === "head" || d.id === "head2" || d.id === "tassel") { dx = d.id === "tassel" ? 0.75 : -0.75; dy = -0.66; } // 斜上方，避免蓋住第 108 顆兩側的珠子
+        if (d.set === "book" && a.z > 1) { d.el.style.display = "none"; d.path.style.display = "none"; return; }
         if (d.id === "sp3") { dx = 0.8; dy = 0.6; } // 第四隔珠：標籤放右下，避開正上方的佛頭珠
         var lx = a.x + dx * d.off, ly = a.y + dy * d.off, tx = dx > 0.35 ? "0" : dx < -0.35 ? "-100%" : "-50%";
-        d.el.style.transform = "translate(" + lx.toFixed(1) + "px," + ly.toFixed(1) + "px) translate(" + tx + ",-50%)";
+        // 標籤保持在可視範圍內（不被畫面邊緣或右側面板切掉）
+        var w = d.w || (d.w = d.el.offsetWidth), left = tx === "0" ? lx : tx === "-100%" ? lx - w : lx - w / 2;
+        var maxR = W - (narrow ? 0 : offX * 2) - 10, cl = Math.max(10, Math.min(left, maxR - w));
+        if (cl !== left) { lx += cl - left; left = cl; }
+        d.el.style.transform = "translate(" + left.toFixed(1) + "px," + ly.toFixed(1) + "px) translate(0,-50%)";
         var ex = dx > 0.35 ? lx : dx < -0.35 ? lx : lx, ey = ly + (dy > 0.5 ? -9 : dy < -0.5 ? 9 : 0);
         d.path.setAttribute("d", "M" + a.x.toFixed(1) + " " + a.y.toFixed(1) + " L" + (dx > 0.35 ? lx - 2 : dx < -0.35 ? lx + 2 : lx).toFixed(1) + " " + ey.toFixed(1));
         d.path.style.display = "";
@@ -277,6 +306,11 @@
       calloutEl.style.transform = narrow ? "translate(" + cx.toFixed(1) + "px," + (cy - 46).toFixed(1) + "px) translate(-50%,-100%)" : "translate(" + (cx - 40).toFixed(1) + "px," + (cy - 86).toFixed(1) + "px) translate(-100%,-100%)";
       calloutEl.style.textAlign = narrow ? "center" : "left";
       if (!narrow) selInfo.cpath.setAttribute("d", "M" + (cx - 14) + " " + (cy - 18) + " L" + (cx - 38) + " " + (cy - 82));
+      selInfo.nb.forEach(function (it, i) {
+        beads[it.n].grp.getWorldPosition(tmp); var q = toScreen(tmp);
+        it.el.style.display = q.z > 1 || q.x < 0 || q.x > W ? "none" : "";
+        it.el.style.transform = "translate(" + q.x.toFixed(1) + "px," + (q.y - 34 - (i % 2) * 22).toFixed(1) + "px) translate(-50%,-100%)";
+      });
       fanItems.forEach(function (it, i) {
         var x = cx - 120, y = cy + 78 + i * 31;
         it.el.style.transform = "translate(" + x.toFixed(1) + "px," + y.toFixed(1) + "px) translate(0,-50%)";
@@ -300,7 +334,10 @@
       var rp = Math.max(narrow ? 13 : 10, c.rad * pxPerUnit(tmp) * (c.bead ? c.obj.scale.x : 1)), d = Math.hypot(s.x - cx, s.y - cy);
       if (d <= rp) { var sc = d / rp + s.z * 0.01; if (sc < bs) { bs = sc; best = c; } }
     }
-    if (best) return best;
+    if (best) {
+      if (best.bead) { var act = KM.actForBead(best.bead.n); return act ? { act: act, obj: best.obj, bead: best.bead } : null; }
+      return best;
+    }
     var md = 1e9;
     malaGroup.updateMatrixWorld();
     for (i = 0; i < ringLocal.length; i++) { tmp.copy(ringLocal[i]).applyMatrix4(malaGroup.matrixWorld); var q = toScreen(tmp); if (q.z > 1) continue; md = Math.min(md, Math.hypot(q.x - cx, q.y - cy)); }
@@ -315,7 +352,7 @@
     renderer.domElement.style.cursor = c ? "pointer" : "grab";
     crosshair.classList.toggle("active", !!c);
   }
-  function isSelBead(c) { var s = selected; return !!(s && c.bead && ((s.k === "bead" && s.n === c.bead.n) || (s.k === "spacer" && D.zones[s.z].spacerNo === c.bead.n))); }
+  function isSelBead(c) { return !!(c.bead && focusBead(selected) === c.bead.n); }
   function onMove(e) { if (down || e.pointerType !== "mouse") return; var p = localXY(e); setHover(pick(p.x, p.y)); }
   function onDown(e) { down = { x: e.clientX, y: e.clientY, t: performance.now() }; userDrag = true; }
   function onUp(e) {
@@ -344,6 +381,11 @@
 
   /* ---------- 對外 ---------- */
   API.setPaused = function (v) { paused = !!v; };
+  API.setMode = function (m, zoneView) {
+    if (!built) return;
+    mode = m; labelSet = m === "book" ? "book" : zoneView ? "zones" : "parts";
+    applyTargets();
+  };
   API.setLines = function (v) { lines = !!v; stage.classList.toggle("nolines", !lines); };
   API.hint = function () {};
   API.screenOf = function (n) { // 供測試：第 n 顆珠在頁面上的座標
