@@ -147,7 +147,6 @@ footer{text-align:center;color:var(--mut);font-size:.85rem;padding:20px 16px 40p
 .modes button+button{border-left:1px solid var(--line)}
 .modes button[aria-pressed=true]{background:var(--acc);color:#fff;font-weight:700}
 .modes button:focus-visible,.controls button:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
-#zoneview[aria-pressed=true]{border-color:var(--acc);color:var(--acc)}
 body.mode-book .mala-only{display:none}
 
 /* ===== 3D 旁文字 ===== */
@@ -275,3 +274,11 @@ body.mode-book .mala-only{display:none}
 
 /* 閱讀時收起操作列（保留模式切換與右側面板），避免壓到放大的珠子 */
 @media (min-width:901px){body.reading .controls{opacity:0;pointer-events:none}.controls{transition:opacity .4s}}
+
+/* ===== 見修行果名相頁：左右兩欄名相 ===== */
+.lab-terms{font-size:13.5px;padding:0 4px;line-height:1.2;letter-spacing:.03em;white-space:nowrap}
+.lab-z0{color:#2f6690}.lab-z1{color:#8a5d10}.lab-z2{color:#5b4597}.lab-z3{color:#a3231c}
+.lab-sp{font-weight:700;letter-spacing:.12em;font-size:14px}
+body.mode-terms #main-quote{display:none}
+body.mode-terms #leaders path{opacity:.4}
+.modes button{padding:6px 14px}

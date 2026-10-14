@@ -273,11 +273,15 @@
       add("sp" + zi, "spacer:" + zi, "隔珠" + "一二三四".charAt(zi) + "・" + zn.name, world(ringPt(zn.spacerNo)), "out", 40);
       add("zn" + zi, "zone:" + zi, zn.name + " " + zn.first + "–" + zn.last, world(ringPt(zi * 27 + 13.5)), "out", 52);
     });
+    // 見修行果名相：76 個名相＋4 顆隔珠，全部標出（左右兩欄排列）
+    set = "terms";
+    D.zones.forEach(function (zn, zi) { add("tsp" + zi, "spacer:" + zi, zn.spacerName + "・" + zn.spacerTitle, world(ringPt(zn.spacerNo)), "col", 0); labelDefs[labelDefs.length - 1].zone = zi; labelDefs[labelDefs.length - 1].spacer = true; });
+    D.terms.forEach(function (t) { add("t" + t.slot, "bead:" + t.slot, t.name, world(ringPt(t.slot)), "col", 0); labelDefs[labelDefs.length - 1].zone = KM.BEADS[t.slot].z; });
     // 原書導讀：17 章各一顆
     set = "book";
     D.chapters.forEach(function (c) { add("ch" + c.no, "chapter:" + c.id, KM.chLabel(c) + " " + KM.shortTitle(c.title), world(ringPt(KM.CH_BEAD[c.id])), "out", 26); });
     labelDefs.forEach(function (d) {
-      var b = document.createElement("button"); b.type = "button"; b.className = "lab lab-" + d.set + (d.html ? " lab-part" : ""); if (d.html) b.innerHTML = d.html; else b.textContent = d.text; b.setAttribute("data-act", d.act); b.setAttribute("aria-label", d.text);
+      var b = document.createElement("button"); b.type = "button"; b.className = "lab lab-" + d.set + (d.html ? " lab-part" : "") + (d.zone != null ? " lab-z" + d.zone : "") + (d.spacer ? " lab-sp" : ""); if (d.html) b.innerHTML = d.html; else b.textContent = d.text; b.setAttribute("data-act", d.act); b.setAttribute("aria-label", d.text);
       b.addEventListener("click", function () { KM.go(d.act); });
       labelsBox.appendChild(b); d.el = b;
       var p = document.createElementNS("http://www.w3.org/2000/svg", "path"); leaders.appendChild(p); d.path = p;
@@ -287,7 +291,7 @@
 
   /* ---------- 版面 ---------- */
   function overviewPos() {
-    var f = Math.max(1, 1.5 / aEff());
+    var f = Math.max(1, 1.5 / aEff()) * (labelSet === "terms" && !narrow ? 1.5 : 1); // 名相頁：念珠縮小，兩側留給名相欄
     return new T.Vector3(0, 30 * f, 60 * f);
   }
   function resize() {
@@ -447,10 +451,33 @@
     st.setProperty("--cx", sp.x.toFixed(1) + "px"); st.setProperty("--cy", sp.y.toFixed(1) + "px"); st.setProperty("--D", Dp.toFixed(1) + "px");
     st.setProperty("--lx", Math.max(64, gapL / 2).toFixed(1) + "px"); st.setProperty("--rx", Math.min(right - 64, sp.x + Dp / 2 + gapR / 2).toFixed(1) + "px");
   }
+  function layoutTerms(ctr) { // 名相依珠子在畫面上的上下位置，排成左右兩欄，以引線連到各自的珠子
+    var L = [], Rt = [], minX = 1e9, maxX = -1e9;
+    labelDefs.forEach(function (d) {
+      if (d.set !== "terms") { d.el.style.display = "none"; d.path.style.display = "none"; return; }
+      d.el.style.display = ""; d.path.style.display = "";
+      d.anchor(tmp); var a = toScreen(tmp); d.a = a; minX = Math.min(minX, a.x); maxX = Math.max(maxX, a.x);
+      (a.x < ctr.x ? L : Rt).push(d);
+    });
+    var top = 150, bottom = H - 14, right = W - (narrow ? 0 : 2 * offX);
+    var pitch = Math.max(14, Math.min(26, (bottom - top) / Math.max(L.length, Rt.length, 1)));
+    [[L, minX - 34, -1], [Rt, maxX + 34, 1]].forEach(function (col) {
+      var list = col[0].sort(function (p, q) { return p.a.y - q.a.y; }), cx = col[1], side = col[2], i, y;
+      for (i = 0; i < list.length; i++) { y = Math.max(top, Math.min(bottom, list[i].a.y)); list[i].ly = i ? Math.max(y, list[i - 1].ly + pitch) : y; }
+      for (i = list.length - 1; i >= 0; i--) { if (i === list.length - 1) list[i].ly = Math.min(list[i].ly, bottom); else list[i].ly = Math.min(list[i].ly, list[i + 1].ly - pitch); }
+      list.forEach(function (d) {
+        var w = d.w || (d.w = d.el.offsetWidth), left = side < 0 ? Math.max(8, cx - w) : Math.min(cx, right - w - 8);
+        var ex = side < 0 ? left + w + 2 : left - 2;
+        d.el.style.transform = "translate(" + left.toFixed(1) + "px," + d.ly.toFixed(1) + "px) translate(0,-50%)";
+        d.path.setAttribute("d", "M" + d.a.x.toFixed(1) + " " + d.a.y.toFixed(1) + " L" + (ex - side * 14).toFixed(1) + " " + d.ly.toFixed(1) + " L" + ex.toFixed(1) + " " + d.ly.toFixed(1));
+      });
+    });
+  }
   function updateOverlays() {
     updateReader();
     var o = toScreen(tmp.set(0, 0, 0)), ctr = { x: o.x, y: o.y };
-    if (!narrow && !focused) {
+    if (!narrow && !focused && labelSet === "terms") layoutTerms(ctr);
+    else if (!narrow && !focused) {
       labelDefs.forEach(function (d) {
         if (d.set !== labelSet) { d.el.style.display = "none"; d.path.style.display = "none"; return; }
         d.el.style.display = "";
@@ -539,7 +566,7 @@
     requestAnimationFrame(loop);
     var raw = clock.getDelta(), dt = Math.min(0.05, raw);
     if (!paused && !reduce) { tt += dt; galaxyGroup.rotation.y += dt * 0.02; baseGroup.rotation.y -= dt * 0.05; }
-    var idle = !focused && !paused && !reduce && !hover && !userDrag;
+    var idle = !focused && !paused && !reduce && !hover && !userDrag && labelSet !== "terms"; // 名相頁不自轉，讓兩欄名相穩定好讀
     spinV += ((idle ? 0.07 : 0) - spinV) * Math.min(1, dt * 2.5); if (paused || reduce) spinV = 0;
     if (!(rotTween && rotTween.isActive())) malaGroup.rotation.y -= spinV * dt;
     bobAmp += ((focused ? 0 : 1) - bobAmp) * Math.min(1, dt * 3);
@@ -569,10 +596,11 @@
     return { worst: worst, bob: bob };
   };
   API.beadTextureURL = function (k) { try { return bodhiTextures([11, 23, 37, 59, 71, 97][k % 6]).canvas.toDataURL("image/jpeg", 0.85); } catch (e) { return ""; } };
-  API.setMode = function (m, zoneView) {
+  API.setMode = function (m) {
     if (!built) return;
-    mode = m; labelSet = m === "book" ? "book" : zoneView ? "zones" : "parts";
+    mode = m; labelSet = m === "book" ? "book" : m === "terms" ? "terms" : "parts";
     applyTargets();
+    if (!selected) { G.killTweensOf(camera.position); var to = overviewPos(); G.to(camera.position, { x: to.x, y: to.y, z: to.z, duration: reduce ? 0.01 : 1.2, ease: "power2.inOut" }); }
   };
   API.setLines = function (v) { lines = !!v; stage.classList.toggle("nolines", !lines); };
   API.hint = function () {};

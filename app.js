@@ -61,7 +61,7 @@
   function termsOfSec(id) { return D.terms.filter(function (t) { return t.refs.some(function (r) { return r.sec === id || (secById[r.sec] && secById[r.sec].parent === id); }); }); }
   function termsOfChapter(cid) { return D.terms.filter(function (t) { return t.refs.some(function (r) { return r.ch === cid; }); }); }
 
-  var sel = null, mode = "mala", zoneView = false, lastBead = 0, has3D = false, batch = {}, narrowMQ = window.matchMedia("(max-width:900px)");
+  var sel = null, mode = "mala", lastBead = 0, has3D = false, batch = {}, narrowMQ = window.matchMedia("(max-width:900px)");
   var KM = window.KM = {
     D: D, BEADS: BEADS, ASSIGNED: ASSIGNED, CH_BEAD: CH_BEAD, termById: termById, chById: chById, secById: secById, esc: esc,
     go: function (a, o) { go(a, o); }, getSel: function () { return sel; }, getMode: function () { return mode; },
@@ -104,32 +104,27 @@
   }
   function select(s, opt) {
     opt = opt || {};
-    var want = s && (s.k === "chapter" || s.k === "sec" || s.k === "extra") ? "book" : s ? "mala" : mode;
+    var want = s && (s.k === "chapter" || s.k === "sec" || s.k === "extra") ? "book" : s ? (mode === "terms" ? "terms" : "mala") : mode; // 名相頁中點珠，返回後仍回名相頁
     if (want !== mode) setMode(want, true);
     sel = s; if (s && (s.k === "bead" || s.k === "empty")) lastBead = s.n;
     renderPanel(); syncToc(); syncNav();
     if (has3D) window.KM3D.setSelection(s);
     syncBeadView();
-    if (opt.hash !== false) { try { history.replaceState(null, "", s ? "#" + hashOf(s) : mode === "book" ? "#book" : location.pathname + location.search); } catch (e) {} }
+    if (opt.hash !== false) { try { history.replaceState(null, "", s ? "#" + hashOf(s) : mode !== "mala" ? "#" + mode : location.pathname + location.search); } catch (e) {} }
     if (opt.tab !== false) showTab("content");
   }
-  function setMode(m, quiet) {
-    mode = m; if (m === "book") zoneView = false;
-    document.body.classList.toggle("mode-book", m === "book");
-    $("#mode-mala").setAttribute("aria-pressed", m === "mala"); $("#mode-book").setAttribute("aria-pressed", m === "book");
-    if (has3D) window.KM3D.setMode(m, zoneView);
+  function setMode(m, quiet) { // 三個頁面：mala＝導師引文部件、terms＝見修行果四區名相、book＝原書章節
+    mode = m;
+    document.body.classList.toggle("mode-book", m === "book"); document.body.classList.toggle("mode-terms", m === "terms");
+    ["mala", "terms", "book"].forEach(function (k) { $("#mode-" + k).setAttribute("aria-pressed", m === k); });
+    if (has3D) window.KM3D.setMode(m);
     if (!quiet) select(null);
-  }
-  function setZoneView(on) {
-    zoneView = on; if (has3D) window.KM3D.setMode(mode, zoneView);
-    var b = $("#zoneview"); if (b) { b.setAttribute("aria-pressed", on); b.textContent = on ? "回到部件譬喻" : "依四區查看名相"; }
   }
   function syncNav() {
     var book = mode === "book";
     $("#prev").textContent = book ? "‹ 上一章" : "‹ 上一珠"; $("#next").textContent = book ? "下一章 ›" : "下一珠 ›";
     $("#prev").setAttribute("aria-label", book ? "上一章" : "上一個已配置珠位"); $("#next").setAttribute("aria-label", book ? "下一章" : "下一個已配置珠位");
     $("#home").textContent = "返回整串";
-    $("#zoneview").hidden = book;
   }
 
   /* ---------- 面板 ---------- */
@@ -182,10 +177,20 @@
     var el = $("#pane-content"), h = "";
     if (!sel && mode === "mala") {
       h = '<p class="crumb">以數珠為喻 ・ 總覽</p><h2>以數珠為喻</h2><p class="guide">點選任一數珠可查看相關名相主題。</p>' +
-        "<p>點部件文字或念珠部件，可看導師引文中的對應譬喻；按「依四區查看名相」，念珠旁會改為標示見、修、行、果四區。上一珠／下一珠只在已配置名相的珠位間移動。</p>" +
+        "<p>此頁標示導師引文中的五種念珠部件。點部件文字或念珠部件，可看對應譬喻；想看全部名相，請切換到上方「見修行果名相」。上一珠／下一珠只在已配置名相的珠位間移動。</p>" +
         "<h3>念珠部件與譬喻 " + tag("quote") + '</h3><ul class="parts">' + PART_KEYS.map(function (k) { var p = D.parts[k]; return '<li><button class="prow" data-go="part:' + k + '"><b>' + esc(p.title) + "</b><span>" + esc(p.text) + "</span></button></li>"; }).join("") + "</ul>" +
         '<h3>見修行果四區 ' + tag("nav") + '</h3><div class="chips">' + D.zones.map(function (zn) { return chip("zone:" + zn.idx, esc(zn.name) + " 區 <small>" + zn.first + "–" + zn.last + "</small>", "zone-" + zn.id); }).join("") + "</div>" +
         '<div class="notice">環上 108 顆＝104 顆普通數珠＋4 顆隔珠（編號 27、54、81、108）；第四隔珠（第 108 顆）較大，兼作佛頭珠，其上加三通塔頭並懸飾穗。「見修行果」是本網站的導覽分類，不是引文原意；引文原本說「以風瑜伽為隔珠」。目前 76 個名相各占一個主珠位，為初始可調整配置，其餘 28 顆待配置；顏色較淺的珠子為待配置珠位。</div>';
+    } else if (!sel && mode === "terms") {
+      h = '<p class="crumb">見修行果名相 ・ 總覽</p><h2>見修行果四區名相</h2><p class="guide">點選任一名相或數珠，可進入該珠查看內容。</p>' +
+        "<p>環上 104 顆普通數珠分為四區，每區 26 顆，以隔珠分隔。76 個名相各占一個主珠位，念珠兩側依位置列出；顏色較淺的珠子為待配置珠位。「見修行果」是本網站的導覽分類，不是引文原意。</p>" +
+        D.zones.map(function (zn) {
+          var ts = termsOfZone(zn.idx), own = ts.filter(function (t) { return t.group === zn.group; });
+          return '<h3 class="zone-' + zn.id + '">' + esc(zn.name) + " 區 <small>數珠 " + zn.first + "–" + zn.last + "・" + zn.spacerName + " " + zn.spacerNo + "・已配置 " + own.length + "／26</small></h3>" +
+            '<p class="small" style="margin:.2em 0">' + esc(zn.summary) + '</p><div class="chips">' + ts.map(function (t) {
+              return t.group === zn.group ? chip("bead:" + t.slot, esc(t.name) + " <small>" + t.slot + "</small>") : chip("bead:" + t.slot, esc(t.name) + " <small>跨類・主珠位在" + esc(t.group) + "區</small>", "cross");
+            }).join("") + "</div>";
+        }).join("");
     } else if (!sel && mode === "book") {
       h = '<p class="crumb">原書導讀 ・ 總覽</p><h2>原書導讀</h2><p class="guide">點選念珠上的章名或任一章，可分層查看節、目與頁碼。</p>' +
         "<p>全書四輯十七章，一章對應一顆數珠，不分見修行果。上一章／下一章只在 17 個章入口間移動；章內的節以「前一批／後一批」換頁。</p>" +
@@ -452,8 +457,8 @@
     $("#bv-next").onclick = function () { step(1); };
 
     $("#mode-mala").onclick = function () { setMode("mala"); };
+    $("#mode-terms").onclick = function () { setMode("terms"); };
     $("#mode-book").onclick = function () { setMode("book"); };
-    $("#zoneview").onclick = function () { if (sel) select(null); setZoneView(!zoneView); };
     $("#chsel").onchange = function (e) { if (e.target.value) go(e.target.value); };
     $("#tab-content").onclick = function () { showTab("content"); };
     $("#tab-toc").onclick = function () { showTab("toc"); };
@@ -464,10 +469,10 @@
     var lb = $("#lines"), on = true;
     lb.onclick = function () { on = !on; if (has3D) KM3D.setLines(on); lb.setAttribute("aria-pressed", on); lb.textContent = on ? "引線：開" : "引線：關"; };
     narrowMQ.addEventListener && narrowMQ.addEventListener("change", function () { batch = {}; renderPanel(); });
-    var m = /^#(bead|spacer|zone|part|ch|sec|x|book)-?(.*)$/.exec(location.hash);
+    var m = /^#(bead|spacer|zone|part|ch|sec|x|book|terms)-?(.*)$/.exec(location.hash);
     if (m) {
       setTimeout(function () {
-        if (m[1] === "book") { setMode("book"); return; }
+        if (m[1] === "book" || m[1] === "terms") { setMode(m[1]); return; }
         var kk = { ch: "chapter", x: "extra" }[m[1]] || m[1];
         go(kk + ":" + decodeURIComponent(m[2]), { hash: false });
       }, 300);
