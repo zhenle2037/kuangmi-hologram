@@ -36,9 +36,10 @@
   var BEADS = [];
   for (var n = 1; n <= 108; n++) {
     var z = Math.floor((n - 1) / 27), r = ((n - 1) % 27) + 1;
+    if (r === 27) z = (n / 27) % 4; // 隔珠在各區之前：108＝隔珠一（見，兼作佛頭）、27＝隔珠二（修）、54＝隔珠三（行）、81＝隔珠四（果）
     BEADS[n] = { n: n, z: z, pos: r, spacer: r === 27, term: null, ch: null };
   }
-  D.zones.forEach(function (zn, zi) { zn.idx = zi; zn.first = zi * 27 + 1; zn.last = zi * 27 + 26; zn.spacerNo = zi * 27 + 27; zn.group = ["見", "修", "行", "果"][zi]; });
+  D.zones.forEach(function (zn, zi) { zn.idx = zi; zn.first = zi * 27 + 1; zn.last = zi * 27 + 26; zn.spacerNo = zi === 0 ? 108 : zi * 27; zn.group = ["見", "修", "行", "果"][zi]; });
   var slotErr = [];
   D.terms.forEach(function (t) {
     var b = BEADS[t.slot], zi = GROUP_Z[t.group];
@@ -88,7 +89,7 @@
       o.sub = zn.name + "區 第 " + b.pos + "／26 珠 ・ 環上 " + s.n + "／108";
       [-2, -1, 1, 2].forEach(function (d) { var m = ((s.n - 1 + d + 108) % 108) + 1, bb = BEADS[m]; if (bb.term) o.neighbors.push({ n: m, text: termById[bb.term].name }); });
     } else if (s.k === "spacer") {
-      var z2 = D.zones[s.z]; o.n = z2.spacerNo; o.name = z2.spacerName + "：" + z2.spacerTitle; o.sub = "環上 " + o.n + "／108 ・ 隔開其前 26 顆數珠";
+      var z2 = D.zones[s.z]; o.n = z2.spacerNo; o.name = z2.spacerName + "：" + z2.spacerTitle; o.sub = "環上 " + o.n + "／108 ・ 引領其後 26 顆數珠";
     } else if (s.k === "chapter" || s.k === "sec") {
       var c2 = chById[s.k === "chapter" ? s.id : secById[s.id].ch]; o.n = CH_BEAD[c2.id];
       o.name = chLabel(c2); o.sub = c2.title;
@@ -183,7 +184,7 @@
         "<p>此頁標示導師引文中的五種念珠部件。點部件文字或念珠部件，可看對應譬喻；想看全部名相，請切換到上方「見修行果名相」。上一珠／下一珠只在已配置名相的珠位間移動。</p>" +
         "<h3>念珠部件與譬喻 " + tag("quote") + '</h3><ul class="parts">' + PART_KEYS.map(function (k) { var p = D.parts[k]; return '<li><button class="prow" data-go="part:' + k + '"><b>' + esc(p.title) + "</b><span>" + esc(p.text) + "</span></button></li>"; }).join("") + "</ul>" +
         '<h3>見修行果四區 ' + tag("nav") + '</h3><div class="chips">' + D.zones.map(function (zn) { return chip("zone:" + zn.idx, esc(zn.name) + " 區 <small>" + zn.first + "–" + zn.last + "</small>", "zone-" + zn.id); }).join("") + "</div>" +
-        '<div class="notice">環上 108 顆＝104 顆普通數珠＋4 顆隔珠（編號 27、54、81、108）；第四隔珠（第 108 顆）較大，兼作佛頭珠，其上加三通塔頭並懸飾穗。「見修行果」是本網站的導覽分類，不是引文原意；引文原本說「以風瑜伽為隔珠」。目前 76 個名相各占一個主珠位，為初始可調整配置，其餘 28 顆待配置；顏色較淺的珠子為待配置珠位。</div>';
+        '<div class="notice">環上 108 顆＝104 顆普通數珠＋4 顆隔珠（隔珠一・見為第 108 顆兼佛頭，隔珠二、三、四為第 27、54、81 顆，各在其區之前）；隔珠一（第 108 顆）較大，兼作佛頭珠，其上加三通塔頭並懸飾穗。「見修行果」是本網站的導覽分類，不是引文原意；引文原本說「以風瑜伽為隔珠」。目前 76 個名相各占一個主珠位，為初始可調整配置，其餘 28 顆待配置；顏色較淺的珠子為待配置珠位。</div>';
     } else if (!sel && mode === "terms") {
       h = '<p class="crumb">見修行果名相 ・ 總覽</p><h2>見修行果四區名相</h2><p class="guide">點隔珠或罩體，進入該區查看名相。</p>' +
         "<p>環上 104 顆普通數珠分為四區，每區 26 顆，以隔珠分隔，念珠上以半透明罩體標出。點隔珠或罩體進入該區，該區名相會在珠子上下列出；再點名相即進入那顆珠。76 個名相各占一個主珠位，顏色較淺的珠子為待配置珠位。「見修行果」是本網站的導覽分類，不是引文原意。</p>" +
@@ -218,7 +219,7 @@
       var z2 = D.zones[sel.z];
       if (sel.k === "spacer") {
         h = zoneHead(z2) + "<h2>" + z2.spacerName + "：" + esc(z2.spacerTitle) + "</h2>" +
-          '<p class="pos">環上編號 ' + z2.spacerNo + "／108 ・ 隔開其前 26 顆普通數珠（" + z2.first + "–" + z2.last + "）</p>";
+          '<p class="pos">環上編號 ' + z2.spacerNo + "／108 ・ 引領其後 26 顆普通數珠（" + z2.first + "–" + z2.last + "）</p>";
         h += "<h3>原文的隔珠譬喻 " + tag("quote") + '</h3><div class="box">以風瑜伽為隔珠</div>';
         h += '<div class="notice">引文原本只說「以風瑜伽為隔珠」。將四顆隔珠分別設為「見、修、行、果」，是本網站的導覽安排，並非引文本身的說法。' + (sel.z === 1 ? "（第二隔珠標示「修（風瑜伽）」，與原文的風瑜伽相呼應。）" : "") + "</div>";
       } else h = zoneHead(z2) + "<h2>" + esc(z2.name) + "　區</h2>";
@@ -228,7 +229,7 @@
       h = '<p class="crumb">以數珠為喻 ・ 念珠部件</p><h2>' + esc(pt.title) + ' <small class="cnt">' + esc(pt.count) + "</small></h2><h3>譬喻 " + tag("quote") + '</h3><div class="box big">' + esc(pt.text) + "</div>";
       if (sel.id === "bead") h += '<p>環上共 108 顆：104 顆普通數珠＋4 顆隔珠。每 26 顆普通數珠之後接 1 顆隔珠。</p><div class="chips">' + D.zones.map(function (zn) { return chip("zone:" + zn.idx, esc(zn.name) + " 區 " + zn.first + "–" + zn.last); }).join("") + "</div>";
       if (sel.id === "spacer") h += '<div class="notice">四顆隔珠在環上第 27、54、81、108 顆。本站另以四隔珠標示「見、修、行、果」四區，這是導覽安排，不是引文原意。</div><div class="chips">' + D.zones.map(function (zn) { return chip("spacer:" + zn.idx, zn.spacerName + "・" + esc(zn.spacerTitle)); }).join("") + "</div>";
-      if (sel.id === "head") h += '<div class="notice">本站以第四隔珠（環上第 108 顆，較其他隔珠大）兼作佛頭珠，上方加三通塔頭，飾穗由塔頭垂下。</div><div class="chips">' + chip("spacer:3", "查看第四隔珠") + "</div>";
+      if (sel.id === "head") h += '<div class="notice">本站以隔珠一・見（環上第 108 顆，較其他隔珠大）兼作佛頭珠，上方加三通塔頭，飾穗由塔頭垂下。</div><div class="chips">' + chip("spacer:0", "查看隔珠一") + "</div>";
       if (sel.id === "tassel") h += '<div class="notice">飾穗繫於佛頭珠尾端，為佛頭珠所懸。</div>';
       if (sel.id === "string") h += '<div class="notice">串繩連續貫穿環上 108 顆珠子。</div>';
       h += '<p class="pend">此為引文中的譬喻；進一步解說待補。</p>';

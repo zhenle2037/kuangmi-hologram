@@ -24,7 +24,7 @@ window.KM_DATA = {
   },
   "head": {
    "title": "佛頭珠",
-   "count": "由第四隔珠兼作",
+   "count": "由隔珠一兼作",
    "text": "佛教教相及僧寶表相",
    "src": "quote"
   },

@@ -166,6 +166,7 @@
     for (n = 1; n <= 108; n++) { RAD[n] = n === 108 ? RG : KM.BEADS[n].spacer ? RS : RB; sum += 2 * RAD[n]; }
     var gap = (TAU * R - sum) / 108; ANG[108] = 0;
     for (n = 1; n <= 107; n++) ANG[n] = ANG[n - 1 || 108] + (RAD[n - 1 || 108] + gap + RAD[n]) / R;
+    for (n = 1; n <= 107; n++) ANG[n] = -ANG[n]; // 依手繪箭頭方向計數：佛頭（隔珠一）→見→隔珠二→修→隔珠三→行→隔珠四→果
     var geoR = new T.SphereGeometry(RB, 48, 32), geoM = new T.SphereGeometry(RS, 48, 32), geoG = new T.SphereGeometry(RG, 64, 44);
     var BT = [11, 23, 37, 59, 71, 97].map(bodhiTextures), agate = agateTexture(), YA = new T.Vector3(0, 1, 0), r = rng(2024);
     function bodhiMat(k) { var tx = BT[k % BT.length]; return new T.MeshPhysicalMaterial({ map: tx.map, bumpMap: tx.bump, bumpScale: 0.022, color: 0xffffff, emissive: 0xffe2b8, emissiveIntensity: 0, roughness: 0.8, metalness: 0, clearcoat: 0, envMapIntensity: 0.28, transparent: true, opacity: 1 }); }
@@ -200,7 +201,7 @@
     for (n = 1; n <= 108; n++) { var sm = new T.Mesh(segGeo, cordMat.clone()); sm.material.transparent = true; sm.userData.op = 1; stringMesh.add(sm); segs[n] = sm; }
     for (var i = 0; i < 128; i++) { var a = i / 128 * TAU; ringLocal.push(new T.Vector3(Math.sin(a) * R, 0, Math.cos(a) * R)); }
 
-    // 佛頭：第四隔珠（環上第 108 顆）兼作佛頭珠；三層三通塔頭沿半徑水平朝外（90°）
+    // 佛頭：隔珠一（環上第 108 顆）兼作佛頭珠；三層三通塔頭沿半徑水平朝外（90°）
     var towerMat = bodhiMat(5);
     guru = new T.Group(); guru.position.set(0, 0, R + RG - 0.12); malaGroup.add(guru);
     var tower = new T.Group(); tower.rotation.x = Math.PI / 2; guru.add(tower); // 幾何沿 y 建造，旋轉後指向 +z（外側）
@@ -260,17 +261,18 @@
       outer.onBeforeCompile = function (sh) { // 琉璃邊緣：越靠輪廓越不透明，形成柔和的玻璃邊光
         sh.fragmentShader = sh.fragmentShader.replace("#include <dithering_fragment>", "#include <dithering_fragment>\n float fres = pow(1.0 - abs(dot(normalize(vViewPosition), normal)), 2.2);\n gl_FragColor.rgb = mix(gl_FragColor.rgb, gl_FragColor.rgb * 0.82, fres);\n gl_FragColor.a = clamp(opacity * (0.55 + 3.2 * fres), 0.0, 0.85);");
       };
-      // 只罩住已配置名相的珠段（空白珠不罩），另以同色琉璃泡罩住該區的隔珠
-      runs.forEach(function (rn) {
-        var a0 = ANG[rn[0]], a1 = ANG[rn[1]], pts = [], k;
+      // 隔珠在各區之前：以同一個琉璃泡罩住「隔珠＋緊接其後的有內容珠段」；空白珠不罩
+      var spN = zn.spacerNo, joined = runs.length && runs[0][0] === zn.first;
+      runs.forEach(function (rn, ri) {
+        var a0 = ri === 0 && joined ? ANG[spN] : ANG[rn[0]], a1 = ANG[rn[1]], pts = [], k;
         for (k = 0; k <= 48; k++) { var a = a0 + (a1 - a0) * k / 48; pts.push(new T.Vector3(Math.sin(a) * R, 0, Math.cos(a) * R)); }
         var curve = new T.CatmullRomCurve3(pts);
         [[outer, HR], [inner, HR * 0.985]].forEach(function (m) {
-          if (rn[0] !== rn[1]) g.add(new T.Mesh(new T.TubeGeometry(curve, 120, m[1], 40, false), m[0]));
+          g.add(new T.Mesh(new T.TubeGeometry(curve, 120, m[1], 40, false), m[0]));
           [pts[0], pts[pts.length - 1]].forEach(function (pp) { var cap = new T.Mesh(new T.SphereGeometry(m[1], 40, 24), m[0]); cap.position.copy(pp); g.add(cap); });
         });
       });
-      var spN = zn.spacerNo, spA = ANG[spN], spR = RAD[spN] + 0.26;
+      var spA = ANG[spN], spR = RAD[spN] + 0.24; // 隔珠較大，罩體在隔珠處隆起成泡
       [[outer, spR], [inner, spR * 0.985]].forEach(function (m) { var b = new T.Mesh(new T.SphereGeometry(m[1], 48, 32), m[0]); b.position.set(Math.sin(spA) * R, 0, Math.cos(spA) * R); g.add(b); });
       g.userData = { zone: zi, outer: outer, base: 0.17 }; g.renderOrder = 2; g.visible = false;
       g.traverse(function (o) { o.userData.zone = zi; o.renderOrder = 2; });
@@ -279,8 +281,8 @@
   }
   function zoneSpan(zi) { // 區畫面要置中的角度範圍：已配置名相的第一顆到最後一顆（沒有則整區）
     var zn = D.zones[zi], rs = zoneRuns(zi);
-    if (!rs.length) return [ANG[zn.first], ANG[zn.last]];
-    return [ANG[rs[0][0]], ANG[rs[rs.length - 1][1]]];
+    if (!rs.length) return [ANG[zn.spacerNo], ANG[zn.last]];
+    return [ANG[zn.spacerNo], ANG[rs[rs.length - 1][1]]]; // 隔珠連同有內容的珠段一起置中
   }
   function zoneRuns(zi) { // 該區已配置名相的連續珠段
     var zn = D.zones[zi], runs = [], st = null;
@@ -299,7 +301,7 @@
       g.userData.outer.emissiveIntensity = hoverHull === zi ? 0.4 : 0.12;
     });
   }
-  function angOf(n) { return ANG[((Math.round(n) - 1 + 108) % 108) + 1] + (n - Math.round(n)) * TAU / 108; }
+  function angOf(n) { return ANG[((Math.round(n) - 1 + 108) % 108) + 1] - (n - Math.round(n)) * TAU / 108; }
 
   /* ---------- 文字入口（螢幕座標的 HTML 標籤＋引線） ---------- */
   function buildLabels() {
@@ -312,7 +314,7 @@
     // 部件譬喻（預設）：五種部件，文字與引文一致
     add("head", "part:head", "佛頭珠", function (out) { return guru.getWorldPosition(out); }, "out", 44, partHtml("head"));
     add("tassel", "part:tassel", "飾穗", function (out) { tassel.userData.hit.getWorldPosition(out); return out; }, "out", 44, partHtml("tassel"));
-    add("pbead", "part:bead", "數珠", world(ringPt(34)), "out", 46, partHtml("bead"));
+    add("pbead", "part:bead", "數珠", world(ringPt(34)), "out", 70, partHtml("bead"));
     add("pspacer", "part:spacer", "隔珠", world(ringPt(81)), "out", 44, partHtml("spacer"));
     add("string", "part:string", "串繩", world(ringPt(67.5)), "in", 90, partHtml("string"));
     // 依四區查看名相
@@ -443,7 +445,7 @@
     var fb = focusBead(sel);
     if (fb) rotTo = -angOf(fb);
     else if (sel && sel.k === "zone" && labelSet === "terms") { var zr = zoneSpan(sel.z); rotTo = -(zr[0] + zr[1]) / 2; } // 有內容的珠段置中
-    else if (sel && sel.k === "zone") rotTo = -(ANG[D.zones[sel.z].first] + (ANG[D.zones[sel.z].spacerNo] || TAU)) / 2; // 第 108 顆的角度為 0，視為 2π
+    else if (sel && sel.k === "zone") rotTo = -(ANG[D.zones[sel.z].first] + ANG[D.zones[sel.z].last]) / 2;
     else if (sel && sel.k === "part" && (sel.id === "head" || sel.id === "tassel")) rotTo = 0;
     if (fb && reading) { // 鏡頭正對被點的珠，使它在畫面中放大到可容納文字的大小
       var availW = W - (narrow ? 0 : 2 * offX), Dpx = narrow ? Math.min(W * 0.92, H * 0.86) : Math.min(H * 0.72, availW * 0.56);
@@ -451,7 +453,7 @@
       camTo = new T.Vector3(0, dist * 0.07, R + dist); tgtTo = new T.Vector3(0, 0, R);
     } else if (fb) { camTo = new T.Vector3(0, 6.5, R + 13); tgtTo = new T.Vector3(0, 0, R); }
     else if (sel && sel.k === "zone" && labelSet === "terms") { // 區畫面：正面看這一區，整排數珠橫在畫面中
-      var zs = zoneSpan(sel.z), half = (zs[1] - zs[0]) / 2 + (RB + 0.5) / R, chord = 2 * R * Math.sin(half), sag = R * (1 - Math.cos(half));
+      var zs = zoneSpan(sel.z), half = Math.abs(zs[1] - zs[0]) / 2 + (RB + 0.6) / R, chord = 2 * R * Math.sin(half), sag = R * (1 - Math.cos(half));
       var availW2 = W - (narrow ? 0 : 2 * offX), dz = chord * (H / 2) / (Math.tan(FOV * Math.PI / 360) * availW2 * 0.94) + sag * 0.5;
       camTo = new T.Vector3(0, dz * 0.12, R + dz - sag * 0.3); tgtTo = new T.Vector3(0, 0, R - sag * 0.4);
     }
@@ -543,9 +545,9 @@
         d.el.style.display = "";
         d.anchor(tmp); var a = toScreen(tmp), dx = a.x - ctr.x, dy = a.y - ctr.y, m = Math.hypot(dx, dy) || 1; dx /= m; dy /= m;
         if (d.mode === "in") { dx = -dx; dy = -dy; }
-        if (d.id === "head" || d.id === "head2" || d.id === "tassel") { dx = d.id === "tassel" ? 0.85 : -0.75; dy = d.id === "tassel" ? 0.5 : -0.66; } // 佛頭往左上、飾穗往右，避免蓋住珠子
+        if (d.id === "head" || d.id === "head2" || d.id === "tassel") { dx = d.id === "tassel" ? 0.6 : -0.6; dy = -0.8; d.off = 78; } // 佛頭、飾穗標籤往上方兩側，避免蓋住佛頭兩旁的珠子 // 佛頭往左上、飾穗往右，避免蓋住珠子
         if (d.set === "book" && a.z > 1) { d.el.style.display = "none"; d.path.style.display = "none"; return; }
-        if (d.id === "sp3") { dx = 0.8; dy = 0.6; } // 第四隔珠：標籤放右下，避開正上方的佛頭珠
+        if (d.id === "sp0") { dx = 0.8; dy = 0.6; } // 隔珠一：標籤放右下，避開正上方的佛頭珠
         var lx = a.x + dx * d.off, ly = a.y + dy * d.off, tx = dx > 0.35 ? "0" : dx < -0.35 ? "-100%" : "-50%";
         // 標籤保持在可視範圍內（不被畫面邊緣或右側面板切掉）
         var w = d.w || (d.w = d.el.offsetWidth), left = tx === "0" ? lx : tx === "-100%" ? lx - w : lx - w / 2;
@@ -641,7 +643,7 @@
     if (!(rotTween && rotTween.isActive())) malaGroup.rotation.y -= spinV * dt;
     bobAmp += ((focused ? 0 : 1) - bobAmp) * Math.min(1, dt * 3);
     lerpBeads(Math.min(0.3, raw));
-    if (guru) { var y108 = beads[108].grp.position.y; guru.position.y = y108; tasselPivot.position.y = y108; } // 佛頭與飾穗隨第四隔珠一起擺動
+    if (guru) { var y108 = beads[108].grp.position.y; guru.position.y = y108; tasselPivot.position.y = y108; } // 佛頭與飾穗隨隔珠一一起擺動
     if (tasselPivot) { tasselPivot.rotation.x = (paused || reduce) ? 0 : Math.sin(tt * 0.9) * 0.05; tasselPivot.rotation.z = (paused || reduce) ? 0 : Math.sin(tt * 0.7 + 1) * 0.035; } // 微風般輕擺 // 淡入淡出依實際時間，慢裝置也能及時完成
     controls.update();
     updateOverlays();
@@ -688,7 +690,7 @@
       out.axisErr = Math.max(out.axisErr, Math.abs(Math.hypot(P[n].x, P[n].z) - R));
     }
     for (var m = 1; m <= 108; m++) { var m2 = m % 108 + 1; out.minGap = Math.min(out.minGap, P[m].distanceTo(P[m2]) - beads[m].r - beads[m2].r); }
-    out.guruAbove = Math.abs(guru.position.y) < 0.01 && Math.abs(guru.position.x - P[108].x) < 0.01 && guru.position.z > P[108].z + RG * 0.8; // 三通塔頭自第四隔珠沿半徑水平朝外
+    out.guruAbove = Math.abs(guru.position.y) < 0.01 && Math.abs(guru.position.x - P[108].x) < 0.01 && guru.position.z > P[108].z + RG * 0.8; // 三通塔頭自隔珠一沿半徑水平朝外
     out.headIsSpacer108 = beads[108].spacer && RAD[108] > RS;
     var tw = new T.Vector3(); tassel.userData.hit.getWorldPosition(tw); malaGroup.worldToLocal(tw); out.tasselHangs = tw.y < -1 && Math.hypot(tw.x, tw.z) > R + RG; // 飾穗垂在珠外緣下方
     out.strings = malaGroup.children.filter(function (c) { return c === stringMesh; }).length;

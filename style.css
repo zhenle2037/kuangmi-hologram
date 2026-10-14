@@ -296,3 +296,10 @@ body.mode-terms #leaders path{opacity:.55}
 .lab-terms.lab-sp{font-size:22px;letter-spacing:.24em;font-weight:400;padding:4px 10px}
 .lab-zterm{letter-spacing:.1em}
 .top h1{font-weight:700}
+
+/* 珠體上的標題：透明底、黑色字（以淡淡的光暈維持可讀性，非底色） */
+.lab,.lab-zterm,.lab-terms,.lab-terms.lab-sp,#fan .nb,#fan .fl{background:none!important;color:#1f1b18!important;text-shadow:0 0 3px rgba(250,247,240,.95),0 0 8px rgba(250,247,240,.8)}
+.lab-zterm:hover,.lab-zterm:focus-visible,.lab:hover,.lab:focus-visible,#fan .nb:hover{background:none!important;color:#9b2226!important}
+.lab-part b{color:#1f1b18!important}
+.bv-side{background:none!important}
+.bv-side .bv-name,.bv-side .bv-dir{color:#1f1b18;text-shadow:0 0 3px rgba(250,247,240,.95),0 0 8px rgba(250,247,240,.8)}
