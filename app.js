@@ -180,7 +180,6 @@
   }
   function renderPanel() {
     var el = $("#pane-content"), h = "";
-    if (isDetail(sel)) { el.innerHTML = '<p class="crumb">珠內閱讀</p><p class="pend">內容顯示於畫面中央的珠內。</p>'; return; }
     if (!sel && mode === "mala") {
       h = '<p class="crumb">以數珠為喻 ・ 總覽</p><h2>以數珠為喻</h2><p class="guide">點選任一數珠可查看相關名相主題。</p>' +
         "<p>點部件文字或念珠部件，可看導師引文中的對應譬喻；按「依四區查看名相」，念珠旁會改為標示見、修、行、果四區。上一珠／下一珠只在已配置名相的珠位間移動。</p>" +
@@ -330,20 +329,19 @@
     return h;
   }
   var bvTimer = null;
-  function syncBeadView() {
+  function syncBeadView() { // 文字浮在放大、半透明的那顆珠上；右側面板保留
     var v = $("#beadview");
-    if (!isDetail(sel)) { if (!v.hidden) { v.classList.remove("on"); clearTimeout(bvTimer); bvTimer = setTimeout(function () { v.hidden = true; }, 350); document.body.classList.remove("reading"); } return; }
+    document.body.classList.toggle("reading", isDetail(sel) && has3D);
+    if (!isDetail(sel) || !has3D) { if (!v.hidden) { v.classList.remove("on"); clearTimeout(bvTimer); bvTimer = setTimeout(function () { v.hidden = true; }, 400); } return; }
     var nb = neighborsOf(sel), wasOpen = !v.hidden && v.classList.contains("on");
     var content = $("#bv-content");
-    content.innerHTML = detailHTML(sel); content.scrollTop = 0;
-    paintOrb($("#bv-orb"), nb.n, nb.warm);
-    paintOrb($("#bv-prev .bv-orb"), nb.prev.n, true); paintOrb($("#bv-next .bv-orb"), nb.next.n, true);
     $("#bv-prev .bv-dir").textContent = "‹ 上一" + nb.unit; $("#bv-next .bv-dir").textContent = "下一" + nb.unit + " ›";
     $("#bv-prev .bv-name").textContent = nb.prev.name; $("#bv-next .bv-name").textContent = nb.next.name;
     $("#bv-prev").setAttribute("aria-label", "上一" + nb.unit + "：" + nb.prev.name); $("#bv-next").setAttribute("aria-label", "下一" + nb.unit + "：" + nb.next.name);
     clearTimeout(bvTimer);
-    if (wasOpen) { v.classList.remove("swap"); void v.offsetWidth; v.classList.add("swap"); }
-    else { v.hidden = false; v.scrollLeft = v.scrollTop = 0; document.body.classList.add("reading"); bvTimer = setTimeout(function () { v.classList.add("on"); content.focus({ preventScroll: true }); }, has3D ? 650 : 20); }
+    v.hidden = false; v.classList.remove("on");
+    content.innerHTML = detailHTML(sel); content.scrollTop = 0;
+    bvTimer = setTimeout(function () { v.classList.add("on"); }, wasOpen ? 900 : 1500); // 等鏡頭拉近、珠子變半透明後再浮現文字
   }
 
   /* ---------- 純文字目次（3D 失效時仍可完整閱讀） ---------- */
@@ -452,7 +450,7 @@
     $("#bv-back").onclick = function () { select(null); };
     $("#bv-prev").onclick = function () { step(-1); };
     $("#bv-next").onclick = function () { step(1); };
-    $("#beadview").addEventListener("scroll", function () { this.scrollLeft = 0; this.scrollTop = 0; }); // 焦點移到半露的側珠時不讓畫面被捲動
+
     $("#mode-mala").onclick = function () { setMode("mala"); };
     $("#mode-book").onclick = function () { setMode("book"); };
     $("#zoneview").onclick = function () { if (sel) select(null); setZoneView(!zoneView); };

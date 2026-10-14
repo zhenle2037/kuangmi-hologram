@@ -7,7 +7,7 @@
   var KM, D, host, stage, renderer, scene, camera, controls, malaGroup, galaxyGroup, baseGroup;
   var GY = 1.85, R = 26, TAU = Math.PI * 2, FOV = 45, ZC = [0x6fe3f0, 0xffd27a, 0xc9a8ff, 0xff8f9d];
   var W = 1, H = 1, narrow = false, offX = 0, offY = 0;
-  var beads = [], guru, tassel, stringMesh, ringLocal = [];
+  var beads = [], guru, tassel, stringMesh, ringLocal = [], segs = [], reading = false, readerEl = null, YAX = new THREE.Vector3(0, 1, 0), tmpQ = new THREE.Quaternion(), tmp3 = new THREE.Vector3(), tmp4 = new THREE.Vector3();
   var paused = false, reduce = false, lines = true, selected = null, focused = false, mode = "mala", labelSet = "parts";
   var hover = null, down = null, userDrag = false, spinV = 0, bobAmp = 1, tt = 0, rotTween = null, built = false;
   var labelDefs = [], labelEls = [], fanEls = [], leaderPaths = {};
@@ -49,7 +49,7 @@
     camera = new T.PerspectiveCamera(FOV, 1, 0.1, 1000);
     controls = new T.OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true; controls.dampingFactor = 0.06; controls.enablePan = false;
-    controls.minDistance = 8; controls.maxDistance = 140; controls.minPolarAngle = 0.3; controls.maxPolarAngle = 1.3;
+    controls.minDistance = 2; controls.maxDistance = 140; controls.minPolarAngle = 0.3; controls.maxPolarAngle = 1.3;
     controls.rotateSpeed = 0.6;
 
     scene.add(new T.HemisphereLight(0xfff6e8, 0xdcc8aa, 0.46));
@@ -171,26 +171,33 @@
     function bodhiMat(k) { var tx = BT[k % BT.length]; return new T.MeshPhysicalMaterial({ map: tx.map, bumpMap: tx.bump, bumpScale: 0.022, color: 0xffffff, emissive: 0xffe2b8, emissiveIntensity: 0, roughness: 0.8, metalness: 0, clearcoat: 0, envMapIntensity: 0.28, transparent: true, opacity: 1 }); }
     function agateMat() { return new T.MeshPhysicalMaterial({ map: agate, color: 0x9c7474, emissive: 0x3a0205, emissiveIntensity: 0, roughness: 0.05, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.02, envMapIntensity: 0.75, reflectivity: 0.8, transparent: true, opacity: 0.93, depthWrite: true }); }
     var agateCore = new T.MeshBasicMaterial({ color: 0x2c0104 }); // 內層透光，讓瑪瑙有深處的紅光
+    var holeGeo = new T.CircleGeometry(0.135, 28), holeMat = new T.MeshStandardMaterial({ color: 0x6e5236, roughness: 1, transparent: true }), holeMatA = new T.MeshStandardMaterial({ color: 0x1e0204, roughness: 0.6, transparent: true });
     for (n = 1; n <= 108; n++) {
       var b = KM.BEADS[n], th = ANG[n], grp = new T.Group(), rr = RAD[n];
       var core = new T.Mesh(b.spacer ? (n === 108 ? geoG : geoM) : geoR, b.spacer ? agateMat() : bodhiMat(n * 7));
       core.castShadow = true;
       var tan = new T.Vector3(Math.cos(th), 0, -Math.sin(th));
-      core.quaternion.setFromUnitVectors(YA, tan).multiply(new T.Quaternion().setFromAxisAngle(YA, r() * TAU));
+      var spin = new T.Quaternion().setFromAxisAngle(YA, r() * TAU);
+      core.quaternion.setFromUnitVectors(YA, tan).multiply(spin);
+      [1, -1].forEach(function (sg) { // 珠孔：兩極的深色凹孔，串繩由此穿入
+        var hole = new T.Mesh(holeGeo, (b.spacer ? holeMatA : holeMat).clone()); hole.position.y = sg * rr * 0.992; hole.rotation.x = sg > 0 ? -Math.PI / 2 : Math.PI / 2; hole.scale.setScalar(rr / RB); core.add(hole);
+      });
       var wire = new T.Object3D(); wire.material = {}; var glow = new T.Object3D(); glow.material = {};
       if (b.spacer) { var inner = new T.Mesh(new T.SphereGeometry(rr * 0.72, 32, 24), agateCore); grp.add(inner); }
       grp.add(core, wire, glow);
       grp.position.set(Math.sin(th) * R, 0, Math.cos(th) * R);
       malaGroup.add(grp);
-      var o = { n: n, grp: grp, core: core, wire: wire, glow: glow, spacer: b.spacer, z: b.z, assigned: !!b.term, r: rr * 1.04, base: b.spacer ? 0.93 : 1,
+      var o = { n: n, grp: grp, core: core, spin: spin, inner: b.spacer ? grp.children[0] : null, wire: wire, glow: glow, spacer: b.spacer, z: b.z, assigned: !!b.term, r: rr * 1.04, base: b.spacer ? 0.93 : 1,
         cur: { op: 1, em: 0.5, wo: 0, go: 0 }, tgt: { op: 1, em: 0.5, wo: 0, go: 0 }, sc: 1 };
       beads[n] = o;
       cands.push({ obj: grp, rad: n === 108 ? 1.3 : b.spacer ? 1.05 : 0.9, bead: o });
     }
     // 串繩（連續圓環，貫穿所有珠心）
     var cordMat = new T.MeshStandardMaterial({ color: 0x9e3a30, roughness: 0.85, envMapIntensity: 0.3 });
-    stringMesh = new T.Mesh(new T.TorusGeometry(R, 0.085, 10, 480), cordMat);
-    stringMesh.rotation.x = Math.PI / 2; malaGroup.add(stringMesh);
+    // 串繩：逐段連接相鄰兩顆珠的珠孔，隨珠子一起擺動（不再是與珠體分離的固定圓環）
+    stringMesh = new T.Group(); malaGroup.add(stringMesh);
+    var segGeo = new T.CylinderGeometry(0.085, 0.085, 1, 12, 1, true);
+    for (n = 1; n <= 108; n++) { var sm = new T.Mesh(segGeo, cordMat.clone()); sm.material.transparent = true; sm.userData.op = 1; stringMesh.add(sm); segs[n] = sm; }
     for (var i = 0; i < 128; i++) { var a = i / 128 * TAU; ringLocal.push(new T.Vector3(Math.sin(a) * R, 0, Math.cos(a) * R)); }
 
     // 佛頭：第四隔珠（環上第 108 顆）兼作佛頭珠；三層三通塔頭沿半徑水平朝外（90°）
@@ -320,8 +327,17 @@
       if (dim) { t.op = 0.28; }
       if (chSet && chSet[n]) { t.em = 1.6; t.go = 0.95; t.wo = 0.7; }
       if (n === selN) { t.em = 1.6; t.go = 1; t.wo = 0.8; }
+      if (reading && selN) { // 珠內閱讀：被點的珠半透明作為文字底，左右相鄰珠半透明，其餘淡出
+        var dk = Math.min(Math.abs(n - selN), 108 - Math.abs(n - selN));
+        t.op = dk === 0 ? 0.3 : dk <= 3 ? 0.5 : 0.08; t.em = 0.6;
+      }
       if (instant) { b.cur.op = t.op; b.cur.em = t.em; b.cur.wo = t.wo; b.cur.go = t.go; }
     }
+    for (n = 1; n <= 108; n++) {
+      var sd = selN ? Math.min(Math.abs(n + 0.5 - selN), 108 - Math.abs(n + 0.5 - selN)) : 99;
+      segs[n].userData.op = reading ? (sd <= 3 ? 0.55 : 0.06) : 1;
+    }
+    if (guru) { var go = reading && selN && Math.min(selN, 108 - selN) > 3 ? 0.08 : 1; [guru, tassel].forEach(function (o) { o.traverse(function (m) { if (m.material) { m.material.transparent = go < 1; m.material.opacity = go; } }); }); }
   }
   function lerpBeads(dt) {
     var k = 1 - Math.exp(-dt * 6);
@@ -330,6 +346,23 @@
       c.op += (t.op - c.op) * k; c.em += (t.em - c.em) * k; c.wo += (t.wo - c.wo) * k; c.go += (t.go - c.go) * k;
       b.core.material.opacity = c.op * b.base; b.core.material.emissiveIntensity = Math.max(0, c.em - 0.8) * 0.35; b.core.material.transparent = b.spacer || c.op < 0.99;
       b.grp.position.y = (paused || reduce) ? 0 : Math.sin(tt * 1.6 + n * 0.35) * 0.16 * bobAmp;
+      if (b.inner) b.inner.visible = c.op > 0.6;
+      b.core.children.forEach(function (h) { h.material.opacity = Math.min(1, c.op * 1.2); });
+    }
+    updateString(k);
+  }
+  function updateString(k) { // 珠孔朝向前後兩顆珠的連線，串繩段由一顆珠孔接到下一顆珠孔
+    for (var n = 1; n <= 108; n++) {
+      var b = beads[n], pv = beads[n === 1 ? 108 : n - 1].grp.position, nx = beads[n === 108 ? 1 : n + 1].grp.position;
+      tmp3.subVectors(nx, pv).normalize(); b.core.quaternion.setFromUnitVectors(YAX, tmp3).multiply(b.spin);
+    }
+    for (n = 1; n <= 108; n++) {
+      var a = beads[n], c2 = beads[n === 108 ? 1 : n + 1], sgm = segs[n];
+      tmp3.subVectors(c2.grp.position, a.grp.position); var len = tmp3.length(); tmp3.divideScalar(len);
+      var ra = RAD[a.n] * a.grp.scale.x * 0.9, rb = RAD[c2.n] * c2.grp.scale.x * 0.9, L = Math.max(0.02, len - ra - rb);
+      tmp4.copy(a.grp.position).addScaledVector(tmp3, ra + L / 2);
+      sgm.position.copy(tmp4); sgm.scale.set(1, L, 1); sgm.quaternion.setFromUnitVectors(YAX, tmp3);
+      var tgt = sgm.userData.op; sgm.material.opacity += (tgt - sgm.material.opacity) * (k || 1); sgm.visible = sgm.material.opacity > 0.03;
     }
   }
 
@@ -345,17 +378,23 @@
   }
   API.setSelection = function (sel) {
     if (!built) return;
-    var prev = selected; selected = sel;
+    var prev = selected, wasReading = reading; selected = sel;
     focused = !!sel && (FOCUS_KINDS[sel.k] || (sel.k === "part" && (sel.id === "head" || sel.id === "tassel")));
+    reading = !!sel && (sel.k === "bead" || sel.k === "empty" || sel.k === "chapter" || sel.k === "sec");
     applyTargets();
-    scaleFor(prev, 1); if (focusBead(sel)) scaleFor(sel, 1.3);
-    var dur = reduce ? 0.01 : 1.9, camTo, tgtTo, rotTo = null;
+    var RS_ = 1.33; // 閱讀時被點的珠放大（相鄰珠仍不重疊）
+    scaleFor(prev, 1); if (focusBead(sel)) scaleFor(sel, reading ? RS_ : 1.3);
+    var dur = reduce ? 0.01 : wasReading && reading ? 1.2 : 1.9, camTo, tgtTo, rotTo = null;
     var f = Math.max(1, 1.45 / aEff());
     var fb = focusBead(sel);
     if (fb) rotTo = -angOf(fb);
     else if (sel && sel.k === "zone") rotTo = -angOf(D.zones[sel.z].first + 13);
     else if (sel && sel.k === "part" && (sel.id === "head" || sel.id === "tassel")) rotTo = 0;
-    if (fb) { camTo = new T.Vector3(0, 6.5, R + 13); tgtTo = new T.Vector3(0, 0, R); }
+    if (fb && reading) { // 鏡頭正對被點的珠，使它在畫面中放大到可容納文字的大小
+      var availW = W - (narrow ? 0 : 2 * offX), Dpx = narrow ? Math.min(W * 0.92, H * 0.86) : Math.min(H * 0.72, availW * 0.56);
+      var dist = RAD[fb] * RS_ * H / (Math.tan(FOV * Math.PI / 360) * Dpx);
+      camTo = new T.Vector3(0, dist * 0.07, R + dist); tgtTo = new T.Vector3(0, 0, R);
+    } else if (fb) { camTo = new T.Vector3(0, 6.5, R + 13); tgtTo = new T.Vector3(0, 0, R); }
     else if (sel && sel.k === "zone") { camTo = new T.Vector3(0, 16 * f, R + 28 * f); tgtTo = new T.Vector3(0, 0, R - 5); }
     else if (sel && sel.k === "part" && (sel.id === "head" || sel.id === "tassel")) { camTo = new T.Vector3(6, 3.5, R + 13); tgtTo = new T.Vector3(0, -1.2, R + 1.4); }
     else { camTo = overviewPos(); tgtTo = new T.Vector3(0, 0, 0); }
@@ -378,6 +417,7 @@
   function buildFocusUI() {
     fanBox.innerHTML = ""; fanPaths.forEach(function (p) { p.remove(); }); fanPaths = []; fanItems = []; selInfo = null;
     calloutEl.classList.remove("on"); mainLeader.style.opacity = 0;
+    if (reading) return; // 珠內閱讀時，文字改寫在珠上（見 #beadview）
     var info = KM.focusInfo(selected); if (!info) return;
     calloutEl.innerHTML = "<b>" + KM.esc(info.name) + "</b><small>" + KM.esc(info.sub) + "</small>";
     selInfo = { n: info.n, nb: [] };
@@ -397,7 +437,18 @@
     });
   }
 
+  function updateReader() {
+    if (!readerEl) readerEl = document.getElementById("beadview");
+    if (!readerEl || !reading) return;
+    var fb = focusBead(selected); if (!fb) return;
+    beads[fb].grp.getWorldPosition(tmp); var sp = toScreen(tmp), Dp = 2 * RAD[fb] * beads[fb].grp.scale.x * pxPerUnit(tmp);
+    var right = W - (narrow ? 0 : 2 * offX), gapL = sp.x - Dp / 2, gapR = right - (sp.x + Dp / 2);
+    var st = readerEl.style;
+    st.setProperty("--cx", sp.x.toFixed(1) + "px"); st.setProperty("--cy", sp.y.toFixed(1) + "px"); st.setProperty("--D", Dp.toFixed(1) + "px");
+    st.setProperty("--lx", Math.max(64, gapL / 2).toFixed(1) + "px"); st.setProperty("--rx", Math.min(right - 64, sp.x + Dp / 2 + gapR / 2).toFixed(1) + "px");
+  }
   function updateOverlays() {
+    updateReader();
     var o = toScreen(tmp.set(0, 0, 0)), ctr = { x: o.x, y: o.y };
     if (!narrow && !focused) {
       labelDefs.forEach(function (d) {
@@ -493,6 +544,7 @@
     if (!(rotTween && rotTween.isActive())) malaGroup.rotation.y -= spinV * dt;
     bobAmp += ((focused ? 0 : 1) - bobAmp) * Math.min(1, dt * 3);
     lerpBeads(Math.min(0.3, raw));
+    if (guru) { var y108 = beads[108].grp.position.y; guru.position.y = y108; tasselPivot.position.y = y108; } // 佛頭與飾穗隨第四隔珠一起擺動
     if (tasselPivot) { tasselPivot.rotation.x = (paused || reduce) ? 0 : Math.sin(tt * 0.9) * 0.05; tasselPivot.rotation.z = (paused || reduce) ? 0 : Math.sin(tt * 0.7 + 1) * 0.035; } // 微風般輕擺 // 淡入淡出依實際時間，慢裝置也能及時完成
     controls.update();
     updateOverlays();
@@ -502,6 +554,20 @@
 
   /* ---------- 對外 ---------- */
   API.setPaused = function (v) { paused = !!v; };
+  API.opacityOf = function (n) { return beads[n].core.material.opacity; };
+  API.isReading = function () { return reading; };
+  API.cordCheck = function () { // 串繩段兩端是否貼在相鄰兩顆珠的珠孔上（擺動中也成立）
+    var worst = 0, bob = 0, v = new T.Vector3(), d = new T.Vector3();
+    for (var n = 1; n <= 108; n++) {
+      var a = beads[n], b = beads[n === 108 ? 1 : n + 1], sg = segs[n];
+      bob = Math.max(bob, Math.abs(a.grp.position.y));
+      d.set(0, 1, 0).applyQuaternion(sg.quaternion);
+      v.copy(sg.position).addScaledVector(d, -sg.scale.y / 2); // 起點
+      var ra = RAD[a.n] * a.grp.scale.x * 0.9;
+      worst = Math.max(worst, Math.abs(v.distanceTo(a.grp.position) - ra));
+    }
+    return { worst: worst, bob: bob };
+  };
   API.beadTextureURL = function (k) { try { return bodhiTextures([11, 23, 37, 59, 71, 97][k % 6]).canvas.toDataURL("image/jpeg", 0.85); } catch (e) { return ""; } };
   API.setMode = function (m, zoneView) {
     if (!built) return;

@@ -20,6 +20,13 @@
     <svg id="leaders" aria-hidden="true"></svg>
     <div id="labels"></div>
     <div id="focus-ui"><div id="callout"></div><div id="fan"></div></div>
+    <div id="beadview" class="bv" hidden aria-live="polite">
+      <div class="bv-veil" aria-hidden="true"></div>
+      <button id="bv-back" class="bv-back" type="button">返回</button>
+      <div id="bv-content" class="bv-scroll" tabindex="0"></div>
+      <button id="bv-prev" class="bv-side bv-left" type="button"><span class="bv-dir">‹ 上一顆</span><span class="bv-name"></span></button>
+      <button id="bv-next" class="bv-side bv-right" type="button"><span class="bv-dir">下一顆 ›</span><span class="bv-name"></span></button>
+    </div>
     <p id="gl-fail" hidden>無法啟動 3D 念珠（瀏覽器不支援 WebGL）。請使用右側「完整目次」與內容面板閱讀，所有資料仍可使用。</p>
   </div>
 
@@ -64,23 +71,13 @@
   </aside>
 </section>
 
-<div id="beadview" class="bv" hidden role="dialog" aria-modal="true" aria-labelledby="bv-title">
-  <button id="bv-prev" class="bv-side bv-left" type="button"><span class="bv-orb"></span><span class="bv-lab"><span class="bv-dir">‹ 上一顆</span><span class="bv-name"></span></span></button>
-  <button id="bv-next" class="bv-side bv-right" type="button"><span class="bv-orb"></span><span class="bv-lab"><span class="bv-dir">下一顆 ›</span><span class="bv-name"></span></span></button>
-  <article class="bv-main">
-    <div id="bv-orb" class="bv-orb big" aria-hidden="true"></div>
-    <div id="bv-content" class="bv-scroll" tabindex="0"></div>
-  </article>
-  <button id="bv-back" class="bv-back" type="button">返回</button>
-</div>
-
 <main>
   <p class="srcnote">上方引文為平實導師原文，逐字保留。四顆隔珠分別設為「見、修、行、果」，是本網站的導覽安排，並非引文本身的說法；引文原本說「以風瑜伽為隔珠」。</p>
   <section class="about" aria-labelledby="ah">
     <h2 id="ah">使用說明與資料說明</h2>
     <ul>
       <li><b>兩種模式</b>：「以數珠為喻」看部件譬喻與見修行果四區名相；「原書導讀」把全書十七章各配一顆數珠，分層閱讀章、節、目與頁碼。兩者共用同一串念珠，按上方按鈕一鍵切換。</li>
-      <li><b>點珠</b>：點任一數珠（原書導讀中為章珠），念珠轉動拉近後進入「珠內閱讀」：名相或章名、內容與章節直接寫在放大的珠子裡，可上下捲動；左右露出上一顆、下一顆，點珠體或文字即可切換，按「返回」或 Esc 回到整串。隔珠、佛頭珠、飾穗、串繩與四區的說明顯示在右側。</li>
+      <li><b>點珠</b>：點任一數珠（原書導讀中為章珠），念珠轉動，鏡頭拉近到那顆珠；珠子放大並變成半透明，名相或章名、內容與章節直接浮現在珠上，可上下捲動。左右相鄰的珠子仍由串繩相連、同樣半透明，點相鄰珠或「上一顆／下一顆」即可切換；右側面板保持顯示。按珠上的「返回」或 Esc 回到整串。</li>
       <li><b>依四區查看名相</b>：念珠旁的部件說明改為見、修、行、果四區入口；選一區即列出該區名相。「持咒」主珠位在修區、可在行區顯示；「密宗之中有解脫」主珠位在果區、可在修區顯示，都是同一份內容。</li>
       <li><b>上一珠／下一珠</b>（或鍵盤 ←／→）只在已配置名相的珠位間移動；原書導讀中變成<b>上一章／下一章</b>，只走 17 個章入口。章內的節每批 7 節（手機 5 節），以「前一批／後一批」換頁。「返回整串」或 Esc 回到總覽。</li>
       <li><b>完整目次</b>：右側分頁列出四輯十七章所有節、目與頁碼，3D 無法載入時也能完整閱讀。</li>

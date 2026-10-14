@@ -16,6 +16,9 @@ const { chromium } = require('playwright');
   /* ---------- 桌面 ---------- */
   const p = await b.newPage({ viewport: { width: 1440, height: 900 } }); watch(p, 'desktop: ');
   await p.goto(url); await p.waitForFunction(() => window.__kmReady, null, { timeout: 90000 });
+  await p.waitForTimeout(2500);
+  const cc = await p.evaluate(() => KM3D.cordCheck());
+  ok('擺動中串繩仍接在每顆珠的珠孔上', cc.bob > 0.03 && cc.worst < 0.02, 'bob ' + cc.bob.toFixed(3) + ' gap ' + cc.worst.toFixed(4));
   await p.click('#motion'); await p.waitForTimeout(1000);
   const st = await p.evaluate(() => KM3D.stats());
   ok('環上108顆', st.beads === 108);
@@ -56,7 +59,9 @@ const { chromium } = require('playwright');
   ok('珠內閱讀：左右露出相鄰珠名', (await p.textContent('#bv-prev .bv-name')).length > 0 && (await p.textContent('#bv-next .bv-name')).length > 0);
   const s5 = await p.evaluate(() => KM3D.screenOf(5));
   ok('點珠：珠子轉到畫面中央', Math.abs(s5.x - 534) < 30, Math.round(s5.x) + ',' + Math.round(s5.y));
-  ok('聚焦時標出相鄰珠名', await p.$$eval('#fan .nb', e => e.length) >= 2);
+  ok('珠內閱讀：該顆數珠放大並半透明，相鄰珠也半透明', await p.evaluate(() => KM3D.isReading() && KM3D.opacityOf(5) < 0.45 && KM3D.opacityOf(6) < 0.7 && KM3D.opacityOf(6) > 0.3));
+
+  ok('右側面板在閱讀時仍顯示', await p.isVisible('#panel'));
   if (shots) await p.screenshot({ path: shots + '/d2-bead.png' });
   await p.evaluate(() => KM.go('bead:17')); await p.waitForTimeout(800); await p.click('#bv-next'); await p.waitForTimeout(500);
   ok('下一珠跳過待配置（17→28）', (await p.evaluate(() => KM.getSel().n)) === 28);
