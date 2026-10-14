@@ -7,7 +7,7 @@
   var KM, D, host, stage, renderer, scene, camera, controls, malaGroup, galaxyGroup, baseGroup;
   var GY = 1.85, R = 26, TAU = Math.PI * 2, FOV = 45, ZC = [0x6fe3f0, 0xffd27a, 0xc9a8ff, 0xff8f9d];
   var W = 1, H = 1, narrow = false, offX = 0, offY = 0;
-  var beads = [], guru, tassel, stringMesh, ringLocal = [], segs = [], reading = false, readerEl = null, YAX = new THREE.Vector3(0, 1, 0), tmpQ = new THREE.Quaternion(), tmp3 = new THREE.Vector3(), tmp4 = new THREE.Vector3();
+  var hulls = [], hoverHull = null, ray = null, beads = [], guru, tassel, stringMesh, ringLocal = [], segs = [], reading = false, readerEl = null, YAX = new THREE.Vector3(0, 1, 0), tmpQ = new THREE.Quaternion(), tmp3 = new THREE.Vector3(), tmp4 = new THREE.Vector3();
   var paused = false, reduce = false, lines = true, selected = null, focused = false, mode = "mala", labelSet = "parts";
   var hover = null, down = null, userDrag = false, spinV = 0, bobAmp = 1, tt = 0, rotTween = null, built = false;
   var labelDefs = [], labelEls = [], fanEls = [], leaderPaths = {};
@@ -49,7 +49,7 @@
     camera = new T.PerspectiveCamera(FOV, 1, 0.1, 1000);
     controls = new T.OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true; controls.dampingFactor = 0.06; controls.enablePan = false;
-    controls.minDistance = 2; controls.maxDistance = 140; controls.minPolarAngle = 0.3; controls.maxPolarAngle = 1.3;
+    controls.minDistance = 2; controls.maxDistance = 140; controls.minPolarAngle = 0.3; controls.maxPolarAngle = 1.5;
     controls.rotateSpeed = 0.6;
 
     scene.add(new T.HemisphereLight(0xfff6e8, 0xdcc8aa, 0.46));
@@ -248,7 +248,37 @@
     });
     tassel.traverse(function (o) { if (o.isMesh) o.castShadow = true; });
     var tbx = new T.Object3D(); tbx.position.set(0, -2.2, 0.32); tassel.add(tbx); tassel.userData.hit = tbx;
+    buildHulls();
     cands.push({ act: "part:tassel", obj: tbx, rad: 1.6 });
+  }
+  function buildHulls() { // 見修行果四區的半透明罩體：沿圓弧包住每區 26 顆數珠，像一段磨砂琉璃
+    var TINT = [0x5f95cc, 0xd6a03c, 0x8e78d0, 0xd2685d];
+    D.zones.forEach(function (zn, zi) {
+      var a0 = ANG[zn.first], a1 = ANG[zn.last], pts = [], k, HR = 0.86; // 罩體不碰到兩端隔珠
+      for (k = 0; k <= 64; k++) { var a = a0 + (a1 - a0) * k / 64; pts.push(new T.Vector3(Math.sin(a) * R, 0, Math.cos(a) * R)); }
+      var curve = new T.CatmullRomCurve3(pts), g = new T.Group();
+      var outer = new T.MeshPhysicalMaterial({ color: TINT[zi], transparent: true, opacity: 0.17, roughness: 0.22, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.08, envMapIntensity: 1.5, depthWrite: false, side: T.FrontSide, emissive: TINT[zi], emissiveIntensity: 0.12 });
+      var inner = new T.MeshPhysicalMaterial({ color: TINT[zi], transparent: true, opacity: 0.07, roughness: 0.5, depthWrite: false, side: T.BackSide });
+      outer.onBeforeCompile = function (sh) { // 琉璃邊緣：越靠輪廓越不透明，形成柔和的玻璃邊光
+        sh.fragmentShader = sh.fragmentShader.replace("#include <dithering_fragment>", "#include <dithering_fragment>\n float fres = pow(1.0 - abs(dot(normalize(vViewPosition), normal)), 2.2);\n gl_FragColor.rgb = mix(gl_FragColor.rgb, gl_FragColor.rgb * 0.82, fres);\n gl_FragColor.a = clamp(opacity * (0.55 + 3.2 * fres), 0.0, 0.85);");
+      };
+      [[outer, HR], [inner, HR * 0.985]].forEach(function (m) {
+        g.add(new T.Mesh(new T.TubeGeometry(curve, 160, m[1], 40, false), m[0]));
+        [pts[0], pts[pts.length - 1]].forEach(function (pp) { var cap = new T.Mesh(new T.SphereGeometry(m[1], 40, 24), m[0]); cap.position.copy(pp); g.add(cap); });
+      });
+      g.userData = { zone: zi, outer: outer, base: 0.17 }; g.renderOrder = 2; g.visible = false;
+      g.traverse(function (o) { o.userData.zone = zi; o.renderOrder = 2; });
+      malaGroup.add(g); hulls[zi] = g;
+    });
+  }
+  function syncHulls() {
+    var on = labelSet === "terms" && !reading;
+    hulls.forEach(function (g, zi) {
+      var selZ = selected && selected.k === "zone" ? selected.z : null;
+      g.visible = on && (selZ == null || selZ === zi);
+      g.userData.outer.opacity = selZ === zi ? 0.06 : hoverHull === zi ? 0.34 : 0.22;
+      g.userData.outer.emissiveIntensity = hoverHull === zi ? 0.4 : 0.12;
+    });
   }
   function angOf(n) { return ANG[((Math.round(n) - 1 + 108) % 108) + 1] + (n - Math.round(n)) * TAU / 108; }
 
@@ -275,8 +305,9 @@
     });
     // 見修行果名相：76 個名相＋4 顆隔珠，全部標出（左右兩欄排列）
     set = "terms";
-    D.zones.forEach(function (zn, zi) { add("tsp" + zi, "spacer:" + zi, zn.spacerName + "・" + zn.spacerTitle, world(ringPt(zn.spacerNo)), "col", 0); labelDefs[labelDefs.length - 1].zone = zi; labelDefs[labelDefs.length - 1].spacer = true; });
-    D.terms.forEach(function (t) { add("t" + t.slot, "bead:" + t.slot, t.name, world(ringPt(t.slot)), "col", 0); labelDefs[labelDefs.length - 1].zone = KM.BEADS[t.slot].z; });
+    D.zones.forEach(function (zn, zi) { add("tsp" + zi, "zone:" + zi, zn.spacerName + "・" + zn.spacerTitle, world(ringPt(zn.spacerNo)), "out", 40); labelDefs[labelDefs.length - 1].zone = zi; labelDefs[labelDefs.length - 1].spacer = true; });
+    set = "zterm"; // 進入某區後才顯示的該區名相
+    D.terms.forEach(function (t) { add("t" + t.slot, "bead:" + t.slot, t.name, world(ringPt(t.slot)), "row", 0); labelDefs[labelDefs.length - 1].zone = KM.BEADS[t.slot].z; labelDefs[labelDefs.length - 1].n = t.slot; });
     // 原書導讀：17 章各一顆
     set = "book";
     D.chapters.forEach(function (c) { add("ch" + c.no, "chapter:" + c.id, KM.chLabel(c) + " " + KM.shortTitle(c.title), world(ringPt(KM.CH_BEAD[c.id])), "out", 26); });
@@ -291,7 +322,7 @@
 
   /* ---------- 版面 ---------- */
   function overviewPos() {
-    var f = Math.max(1, 1.5 / aEff()) * (labelSet === "terms" && !narrow ? 1.5 : 1); // 名相頁：念珠縮小，兩側留給名相欄
+    var f = Math.max(1, 1.5 / aEff()) * 1;
     return new T.Vector3(0, 30 * f, 60 * f);
   }
   function resize() {
@@ -392,13 +423,18 @@
     var f = Math.max(1, 1.45 / aEff());
     var fb = focusBead(sel);
     if (fb) rotTo = -angOf(fb);
-    else if (sel && sel.k === "zone") rotTo = -angOf(D.zones[sel.z].first + 13);
+    else if (sel && sel.k === "zone") rotTo = -(ANG[D.zones[sel.z].first] + (ANG[D.zones[sel.z].spacerNo] || TAU)) / 2; // 第 108 顆的角度為 0，視為 2π
     else if (sel && sel.k === "part" && (sel.id === "head" || sel.id === "tassel")) rotTo = 0;
     if (fb && reading) { // 鏡頭正對被點的珠，使它在畫面中放大到可容納文字的大小
       var availW = W - (narrow ? 0 : 2 * offX), Dpx = narrow ? Math.min(W * 0.92, H * 0.86) : Math.min(H * 0.72, availW * 0.56);
       var dist = RAD[fb] * RS_ * H / (Math.tan(FOV * Math.PI / 360) * Dpx);
       camTo = new T.Vector3(0, dist * 0.07, R + dist); tgtTo = new T.Vector3(0, 0, R);
     } else if (fb) { camTo = new T.Vector3(0, 6.5, R + 13); tgtTo = new T.Vector3(0, 0, R); }
+    else if (sel && sel.k === "zone" && labelSet === "terms") { // 區畫面：正面看這一區，整排數珠橫在畫面中
+      var zn = D.zones[sel.z], half = ((ANG[zn.spacerNo] || TAU) - ANG[zn.first]) / 2 + 0.02, chord = 2 * R * Math.sin(half), sag = R * (1 - Math.cos(half));
+      var availW2 = W - (narrow ? 0 : 2 * offX), dz = chord * (H / 2) / (Math.tan(FOV * Math.PI / 360) * availW2 * 0.94) + sag * 0.5;
+      camTo = new T.Vector3(0, dz * 0.12, R + dz - sag * 0.3); tgtTo = new T.Vector3(0, 0, R - sag * 0.4);
+    }
     else if (sel && sel.k === "zone") { camTo = new T.Vector3(0, 16 * f, R + 28 * f); tgtTo = new T.Vector3(0, 0, R - 5); }
     else if (sel && sel.k === "part" && (sel.id === "head" || sel.id === "tassel")) { camTo = new T.Vector3(6, 3.5, R + 13); tgtTo = new T.Vector3(0, -1.2, R + 1.4); }
     else { camTo = overviewPos(); tgtTo = new T.Vector3(0, 0, 0); }
@@ -408,8 +444,11 @@
     G.to(controls.target, { x: tgtTo.x, y: tgtTo.y, z: tgtTo.z, duration: dur, ease: "power3.inOut" });
     G.to(camera.position, { x: camTo.x, y: camTo.y, z: camTo.z, duration: dur, ease: "power3.inOut", onComplete: function () { controls.enabled = true; } });
     quoteEl.classList.toggle("hide", !!focused && !narrow);
-    labelsBox.classList.toggle("hide", !!focused);
+    labelsBox.classList.toggle("hide", !!focused && !(labelSet === "terms" && sel && sel.k === "zone"));
+    syncHulls();
+    if (labelSet === "terms" && sel && sel.k === "zone") { var z3 = D.zones[sel.z], own = D.terms.filter(function (t) { return t.group === z3.group; }).length; calloutEl.innerHTML = "<b>" + KM.esc(z3.name) + "　區</b><small>數珠 " + z3.first + "–" + z3.last + " ・ " + z3.spacerName + " " + z3.spacerNo + " ・ 已配置 " + own + "／26 ・ 點名相進入該珠</small>"; calloutEl.classList.add("on", "zonehead"); } else calloutEl.classList.remove("zonehead");
     buildFocusUI();
+    if (labelSet === "terms" && sel && sel.k === "zone") calloutEl.classList.add("on");
   };
   function scaleFor(s, v) {
     var n = focusBead(s); if (!n) return;
@@ -451,32 +490,33 @@
     st.setProperty("--cx", sp.x.toFixed(1) + "px"); st.setProperty("--cy", sp.y.toFixed(1) + "px"); st.setProperty("--D", Dp.toFixed(1) + "px");
     st.setProperty("--lx", Math.max(64, gapL / 2).toFixed(1) + "px"); st.setProperty("--rx", Math.min(right - 64, sp.x + Dp / 2 + gapR / 2).toFixed(1) + "px");
   }
-  function layoutTerms(ctr) { // 名相依珠子在畫面上的上下位置，排成左右兩欄，以引線連到各自的珠子
-    var L = [], Rt = [], minX = 1e9, maxX = -1e9;
+  function layoutZone(zi) { // 某區：名相分上下多排，依珠子左右順序擺放、互不重疊，以引線連到各自的珠
+    var rowsY = [-1, 1, -2, 2, -3, 3], rowR = {}, right = W - (narrow ? 0 : 2 * offX), list = [];
     labelDefs.forEach(function (d) {
-      if (d.set !== "terms") { d.el.style.display = "none"; d.path.style.display = "none"; return; }
+      if (d.set !== "zterm" || d.zone !== zi) { if (d.set !== "zterm" || d.zone !== zi) { d.el.style.display = "none"; d.path.style.display = "none"; } return; }
       d.el.style.display = ""; d.path.style.display = "";
-      d.anchor(tmp); var a = toScreen(tmp); d.a = a; minX = Math.min(minX, a.x); maxX = Math.max(maxX, a.x);
-      (a.x < ctr.x ? L : Rt).push(d);
+      beads[d.n].grp.getWorldPosition(tmp); d.a = toScreen(tmp); d.rpx = RAD[d.n] * pxPerUnit(tmp); list.push(d);
     });
-    var top = 150, bottom = H - 14, right = W - (narrow ? 0 : 2 * offX);
-    var pitch = Math.max(14, Math.min(26, (bottom - top) / Math.max(L.length, Rt.length, 1)));
-    [[L, minX - 34, -1], [Rt, maxX + 34, 1]].forEach(function (col) {
-      var list = col[0].sort(function (p, q) { return p.a.y - q.a.y; }), cx = col[1], side = col[2], i, y;
-      for (i = 0; i < list.length; i++) { y = Math.max(top, Math.min(bottom, list[i].a.y)); list[i].ly = i ? Math.max(y, list[i - 1].ly + pitch) : y; }
-      for (i = list.length - 1; i >= 0; i--) { if (i === list.length - 1) list[i].ly = Math.min(list[i].ly, bottom); else list[i].ly = Math.min(list[i].ly, list[i + 1].ly - pitch); }
-      list.forEach(function (d) {
-        var w = d.w || (d.w = d.el.offsetWidth), left = side < 0 ? Math.max(8, cx - w) : Math.min(cx, right - w - 8);
-        var ex = side < 0 ? left + w + 2 : left - 2;
-        d.el.style.transform = "translate(" + left.toFixed(1) + "px," + d.ly.toFixed(1) + "px) translate(0,-50%)";
-        d.path.setAttribute("d", "M" + d.a.x.toFixed(1) + " " + d.a.y.toFixed(1) + " L" + (ex - side * 14).toFixed(1) + " " + d.ly.toFixed(1) + " L" + ex.toFixed(1) + " " + d.ly.toFixed(1));
-      });
+    list.sort(function (p, q) { return p.a.x - q.a.x; });
+    calloutEl.style.transform = "translate(" + ((W - (narrow ? 0 : 2 * offX)) / 2).toFixed(1) + "px," + (narrow ? 40 : 170) + "px) translate(-50%,0)"; calloutEl.style.textAlign = "center";
+    var gap = narrow ? 30 : 46;
+    list.forEach(function (d) {
+      var w = d.w || (d.w = d.el.offsetWidth), pick = null;
+      for (var k = 0; k < rowsY.length; k++) { var rr = rowsY[k], left = Math.max(6, Math.min(right - w - 6, d.a.x - w / 2)); if (rowR[rr] == null || left > rowR[rr] + 12) { pick = rr; break; } }
+      if (pick == null) pick = rowsY.reduce(function (m, rr) { return rowR[rr] < rowR[m] ? rr : m; }, rowsY[0]);
+      var lx = Math.max(6, Math.min(right - w - 6, d.a.x - w / 2)); rowR[pick] = lx + w;
+      var ly = d.a.y + Math.sign(pick) * (d.rpx + 18 + (Math.abs(pick) - 1) * gap + 10);
+      d.el.style.transform = "translate(" + lx.toFixed(1) + "px," + ly.toFixed(1) + "px) translate(0,-50%)";
+      var y0 = d.a.y + Math.sign(pick) * d.rpx, y1 = ly - Math.sign(pick) * 11;
+      d.path.setAttribute("d", "M" + d.a.x.toFixed(1) + " " + y0.toFixed(1) + " L" + d.a.x.toFixed(1) + " " + ((y0 + y1) / 2).toFixed(1) + " L" + (lx + w / 2).toFixed(1) + " " + y1.toFixed(1));
     });
+    labelDefs.forEach(function (d) { if (d.set !== "zterm") { d.el.style.display = "none"; d.path.style.display = "none"; } });
   }
   function updateOverlays() {
     updateReader();
     var o = toScreen(tmp.set(0, 0, 0)), ctr = { x: o.x, y: o.y };
-    if (!narrow && !focused && labelSet === "terms") layoutTerms(ctr);
+    var zoneView = labelSet === "terms" && selected && selected.k === "zone";
+    if (zoneView) layoutZone(selected.z);
     else if (!narrow && !focused) {
       labelDefs.forEach(function (d) {
         if (d.set !== labelSet) { d.el.style.display = "none"; d.path.style.display = "none"; return; }
@@ -496,7 +536,7 @@
         d.path.setAttribute("d", "M" + a.x.toFixed(1) + " " + a.y.toFixed(1) + " L" + (dx > 0.35 ? lx - 2 : dx < -0.35 ? lx + 2 : lx).toFixed(1) + " " + ey.toFixed(1));
         d.path.style.display = "";
       });
-    } else labelDefs.forEach(function (d) { d.path.style.display = "none"; });
+    } else labelDefs.forEach(function (d) { d.path.style.display = "none"; if (d.set === "zterm") d.el.style.display = "none"; });
 
     if (selInfo) {
       beads[selInfo.n].grp.getWorldPosition(tmp); var s = toScreen(tmp), cx = s.x, cy = s.y;
@@ -532,6 +572,14 @@
       var rp = Math.max(narrow ? 13 : 10, c.rad * pxPerUnit(tmp) * (c.bead ? c.obj.scale.x : 1)), d = Math.hypot(s.x - cx, s.y - cy);
       if (d <= rp) { var sc = d / rp + s.z * 0.01; if (sc < bs) { bs = sc; best = c; } }
     }
+    var termsOverview = labelSet === "terms" && !selected;
+    if (termsOverview) { // 名相頁總覽：點珠或罩體都進入該區
+      if (best && best.bead) return { act: "zone:" + best.bead.z, hull: best.bead.z };
+      if (!ray) ray = new T.Raycaster();
+      ray.setFromCamera({ x: cx / W * 2 - 1, y: -(cy / H) * 2 + 1 }, camera);
+      var hit = ray.intersectObjects(hulls.filter(function (g) { return g.visible; }), true)[0];
+      return hit ? { act: "zone:" + hit.object.userData.zone, hull: hit.object.userData.zone } : null;
+    }
     if (best) {
       if (best.bead) { var act = KM.actForBead(best.bead.n); return act ? { act: act, obj: best.obj, bead: best.bead } : null; }
       return best;
@@ -544,6 +592,8 @@
   }
   function localXY(e) { var r = renderer.domElement.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
   function setHover(c) {
+    var hz = c && c.hull != null ? c.hull : null; if (hz !== hoverHull) { hoverHull = hz; syncHulls(); }
+    if (c && c.hull != null) { renderer.domElement.style.cursor = "pointer"; if (hover && hover.obj && hover.bead) G.to(hover.obj.scale, { x: 1, y: 1, z: 1, duration: 0.3 }); hover = null; return; }
     if (hover && hover.obj && hover.obj !== (c && c.obj) && hover.bead && !(selected && selected.k !== "zone" && isSelBead(hover))) G.to(hover.obj.scale, { x: 1, y: 1, z: 1, duration: 0.3 });
     hover = c;
     if (c && c.bead && !isSelBead(c)) G.to(c.obj.scale, { x: 1.25, y: 1.25, z: 1.25, duration: 0.3, ease: "back.out(1.7)" });
@@ -583,6 +633,7 @@
   API.setPaused = function (v) { paused = !!v; };
   API.opacityOf = function (n) { return beads[n].core.material.opacity; };
   API.isReading = function () { return reading; };
+  API.hullsVisible = function () { return hulls.filter(function (g) { return g.visible; }).length; };
   API.cordCheck = function () { // 串繩段兩端是否貼在相鄰兩顆珠的珠孔上（擺動中也成立）
     var worst = 0, bob = 0, v = new T.Vector3(), d = new T.Vector3();
     for (var n = 1; n <= 108; n++) {
@@ -599,7 +650,7 @@
   API.setMode = function (m) {
     if (!built) return;
     mode = m; labelSet = m === "book" ? "book" : m === "terms" ? "terms" : "parts";
-    applyTargets();
+    applyTargets(); syncHulls();
     if (!selected) { G.killTweensOf(camera.position); var to = overviewPos(); G.to(camera.position, { x: to.x, y: to.y, z: to.z, duration: reduce ? 0.01 : 1.2, ease: "power2.inOut" }); }
   };
   API.setLines = function (v) { lines = !!v; stage.classList.toggle("nolines", !lines); };

@@ -61,7 +61,7 @@
   function termsOfSec(id) { return D.terms.filter(function (t) { return t.refs.some(function (r) { return r.sec === id || (secById[r.sec] && secById[r.sec].parent === id); }); }); }
   function termsOfChapter(cid) { return D.terms.filter(function (t) { return t.refs.some(function (r) { return r.ch === cid; }); }); }
 
-  var sel = null, mode = "mala", lastBead = 0, has3D = false, batch = {}, narrowMQ = window.matchMedia("(max-width:900px)");
+  var sel = null, backSel = null, mode = "mala", lastBead = 0, has3D = false, batch = {}, narrowMQ = window.matchMedia("(max-width:900px)");
   var KM = window.KM = {
     D: D, BEADS: BEADS, ASSIGNED: ASSIGNED, CH_BEAD: CH_BEAD, termById: termById, chById: chById, secById: secById, esc: esc,
     go: function (a, o) { go(a, o); }, getSel: function () { return sel; }, getMode: function () { return mode; },
@@ -105,6 +105,9 @@
   function select(s, opt) {
     opt = opt || {};
     var want = s && (s.k === "chapter" || s.k === "sec" || s.k === "extra") ? "book" : s ? (mode === "terms" ? "terms" : "mala") : mode; // 名相頁中點珠，返回後仍回名相頁
+    // 返回目標：從某區點進珠子時記住該區；換到其他頁面或離開珠內閱讀就清除
+    if (want !== mode || !isDetail(s)) backSel = null;
+    else if (sel && sel.k === "zone") backSel = sel;
     if (want !== mode) setMode(want, true);
     sel = s; if (s && (s.k === "bead" || s.k === "empty")) lastBead = s.n;
     renderPanel(); syncToc(); syncNav();
@@ -182,8 +185,8 @@
         '<h3>見修行果四區 ' + tag("nav") + '</h3><div class="chips">' + D.zones.map(function (zn) { return chip("zone:" + zn.idx, esc(zn.name) + " 區 <small>" + zn.first + "–" + zn.last + "</small>", "zone-" + zn.id); }).join("") + "</div>" +
         '<div class="notice">環上 108 顆＝104 顆普通數珠＋4 顆隔珠（編號 27、54、81、108）；第四隔珠（第 108 顆）較大，兼作佛頭珠，其上加三通塔頭並懸飾穗。「見修行果」是本網站的導覽分類，不是引文原意；引文原本說「以風瑜伽為隔珠」。目前 76 個名相各占一個主珠位，為初始可調整配置，其餘 28 顆待配置；顏色較淺的珠子為待配置珠位。</div>';
     } else if (!sel && mode === "terms") {
-      h = '<p class="crumb">見修行果名相 ・ 總覽</p><h2>見修行果四區名相</h2><p class="guide">點選任一名相或數珠，可進入該珠查看內容。</p>' +
-        "<p>環上 104 顆普通數珠分為四區，每區 26 顆，以隔珠分隔。76 個名相各占一個主珠位，念珠兩側依位置列出；顏色較淺的珠子為待配置珠位。「見修行果」是本網站的導覽分類，不是引文原意。</p>" +
+      h = '<p class="crumb">見修行果名相 ・ 總覽</p><h2>見修行果四區名相</h2><p class="guide">點隔珠或罩體，進入該區查看名相。</p>' +
+        "<p>環上 104 顆普通數珠分為四區，每區 26 顆，以隔珠分隔，念珠上以半透明罩體標出。點隔珠或罩體進入該區，該區名相會在珠子上下列出；再點名相即進入那顆珠。76 個名相各占一個主珠位，顏色較淺的珠子為待配置珠位。「見修行果」是本網站的導覽分類，不是引文原意。</p>" +
         D.zones.map(function (zn) {
           var ts = termsOfZone(zn.idx), own = ts.filter(function (t) { return t.group === zn.group; });
           return '<h3 class="zone-' + zn.id + '">' + esc(zn.name) + " 區 <small>數珠 " + zn.first + "–" + zn.last + "・" + zn.spacerName + " " + zn.spacerNo + "・已配置 " + own.length + "／26</small></h3>" +
@@ -423,6 +426,7 @@
     draw();
   }
 
+  function goBack() { var b = backSel; select(isDetail(sel) && b ? b : null); }
   function init() {
     initQuote();
     buildToc();
@@ -447,12 +451,12 @@
       if (/INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return;
       if (e.key === "ArrowRight") step(1);
       else if (e.key === "ArrowLeft") step(-1);
-      else if (e.key === "Escape") select(null);
+      else if (e.key === "Escape") goBack();
     });
     $("#prev").onclick = function () { step(-1); };
     $("#next").onclick = function () { step(1); };
     $("#home").onclick = function () { select(null); };
-    $("#bv-back").onclick = function () { select(null); };
+    $("#bv-back").onclick = function () { goBack(); };
     $("#bv-prev").onclick = function () { step(-1); };
     $("#bv-next").onclick = function () { step(1); };
 

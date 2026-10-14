@@ -282,3 +282,10 @@ body.mode-book .mala-only{display:none}
 body.mode-terms #main-quote{display:none}
 body.mode-terms #leaders path{opacity:.4}
 .modes button{padding:6px 14px}
+
+/* 名相頁：區畫面的名相與區標題 */
+.lab-zterm{font-size:14.5px;padding:2px 6px;border-radius:4px;background:rgba(253,250,244,.72);white-space:nowrap;letter-spacing:.04em}
+.lab-zterm:hover,.lab-zterm:focus-visible{background:#fff}
+body.mode-terms #leaders path{opacity:.55}
+#callout.zonehead b{font-size:28px;letter-spacing:.3em;color:var(--acc)}
+#callout.zonehead small{font-size:14px;color:#5e5249;letter-spacing:.06em;max-width:none;white-space:nowrap}
