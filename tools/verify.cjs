@@ -9,7 +9,9 @@ const { chromium } = require('playwright');
   const WAIT = 7000;
   const errs = [];
   const watch = (p, tag) => { p.on('requestfailed', r => { if (!/fonts\.g/.test(r.url())) errs.push(tag + 'request failed ' + r.url()); }); p.on('pageerror', e => errs.push(tag + String(e))); p.on('console', m => { if (m.type() === 'error' && !/ERR_TUNNEL|ERR_FILE_NOT_FOUND|fonts\.g/.test(m.text())) errs.push(tag + m.text()); }); };
-  const pane = p => p.textContent('#pane-content');
+  // 點珠／章／節後，內容顯示在珠內閱讀畫面（#bv-content）；其餘在右側面板
+  const pane = p => p.evaluate(() => { const v = document.getElementById('beadview'); return (v && !v.hidden ? document.getElementById('bv-content') : document.getElementById('pane-content')).textContent; });
+  const home = p => p.evaluate(() => { const v = document.getElementById('beadview'); document.getElementById(v && !v.hidden ? 'bv-back' : 'home').click(); }); // 返回整串
 
   /* ---------- 桌面 ---------- */
   const p = await b.newPage({ viewport: { width: 1440, height: 900 } }); watch(p, 'desktop: ');
@@ -20,7 +22,7 @@ const { chromium } = require('playwright');
   ok('隔珠在27/54/81/108', JSON.stringify(st.spacers) === '[27,54,81,108]');
   ok('串繩連續貫穿、珠心同圓', st.axisErr < 1e-6 && st.strings === 1);
   ok('相鄰珠不重疊', st.minGap > 0, st.minGap.toFixed(3));
-  ok('第四隔珠兼作佛頭珠（較大）、三通塔頭在其正上方', st.guruAbove && st.headIsSpacer108);
+  ok('第四隔珠兼作佛頭珠（較大）、三通塔頭水平朝外', st.guruAbove && st.headIsSpacer108);
   ok('飾穗自塔頭垂下、位於珠外緣下方', st.tasselHangs);
   const d = await p.evaluate(() => {
     const D = KM.D, by = g => D.terms.filter(t => t.group === g).length;
@@ -50,29 +52,30 @@ const { chromium } = require('playwright');
 
   const c5 = await p.evaluate(() => KM3D.screenOf(5)); await p.mouse.click(c5.x, c5.y);
   await p.waitForFunction(() => Math.abs(KM3D.screenOf(5).x - 534) < 30, null, { timeout: 30000 }).catch(() => {}); await p.waitForTimeout(1500);
-  ok('點珠：面板直接顯示名相與來源', (await pane(p)).includes('相關章節與頁碼'));
+  ok('點珠：進入珠內閱讀，直接顯示名相與章節', (await pane(p)).includes('章節') && await p.isVisible('#beadview'));
+  ok('珠內閱讀：左右露出相鄰珠名', (await p.textContent('#bv-prev .bv-name')).length > 0 && (await p.textContent('#bv-next .bv-name')).length > 0);
   const s5 = await p.evaluate(() => KM3D.screenOf(5));
   ok('點珠：珠子轉到畫面中央', Math.abs(s5.x - 534) < 30, Math.round(s5.x) + ',' + Math.round(s5.y));
   ok('聚焦時標出相鄰珠名', await p.$$eval('#fan .nb', e => e.length) >= 2);
   if (shots) await p.screenshot({ path: shots + '/d2-bead.png' });
-  await p.evaluate(() => KM.go('bead:17')); await p.click('#next'); await p.waitForTimeout(500);
+  await p.evaluate(() => KM.go('bead:17')); await p.waitForTimeout(800); await p.click('#bv-next'); await p.waitForTimeout(500);
   ok('下一珠跳過待配置（17→28）', (await p.evaluate(() => KM.getSel().n)) === 28);
-  await p.click('#prev'); await p.waitForTimeout(300);
+  await p.click('#bv-prev'); await p.waitForTimeout(300);
   ok('上一珠（28→17）', (await p.evaluate(() => KM.getSel().n)) === 17);
   await p.evaluate(() => KM.go('bead:20')); await p.waitForTimeout(300);
   ok('未配置珠位顯示待配置', (await pane(p)).includes('待配置珠位'));
   await p.evaluate(() => KM.go('zone:2')); await p.waitForTimeout(300);
   ok('行區列出跨類的持咒（同一珠位）', await p.evaluate(() => !![...document.querySelectorAll('#pane-content .chip.cross')].find(e => e.textContent.includes('持咒') && e.dataset.go === 'bead:' + KM.D.terms.find(t => t.name === '持咒').slot)));
-  await p.click('#home'); await p.waitForTimeout(WAIT);
+  await home(p); await p.waitForTimeout(WAIT);
   await p.click('#zoneview'); await p.waitForTimeout(2500);
   ok('依四區查看名相：顯示四區入口', await p.evaluate(() => [...document.querySelectorAll('.lab-zones')].filter(e => e.style.display !== 'none').length) >= 8);
   await p.click('.lab-zones[data-act="zone:0"]'); await p.waitForTimeout(500);
   ok('選區後列出該區名相', (await pane(p)).includes('如來藏'));
   await p.evaluate(() => KM.go('bead:1')); await p.waitForTimeout(300);
-  await p.click('#pane-content .ref[data-go="sec:6-1"]'); await p.waitForTimeout(500);
+  await p.click('#bv-content .ref[data-go="sec:6-1"]'); await p.waitForTimeout(500);
   ok('由名相的章節頁碼進入原書導讀同一節', (await p.evaluate(() => KM.getMode() + ' ' + KM.getSel().id)) === 'book 6-1');
 
-  await p.click('#home'); await p.waitForTimeout(WAIT);
+  await home(p); await p.waitForTimeout(WAIT);
   ok('原書導讀：顯示17章名', await p.evaluate(() => [...document.querySelectorAll('.lab-book')].filter(e => e.style.display !== 'none').length) >= 14);
   if (shots) await p.screenshot({ path: shots + '/d3-book.png' });
   await p.evaluate(() => KM.go('chapter:c14')); await p.waitForTimeout(WAIT);
@@ -81,12 +84,13 @@ const { chromium } = require('playwright');
   ok('換批到最後一批（第36–40節）', (await pane(p)).includes('第 36–40 節／共 40 節'));
   ok('最後一批「後一批」停用', await p.$eval('[data-batch="c14:1"]', e => e.disabled));
   if (shots) await p.screenshot({ path: shots + '/d4-chapter.png' });
-  await p.click('#next'); await p.waitForTimeout(300);
+  await p.click('#bv-next'); await p.waitForTimeout(300);
   ok('下一章只走章入口（14→15）', (await p.evaluate(() => KM.getSel().id)) === 'c15');
   await p.evaluate(() => KM.go('sec:16-1')); await p.waitForTimeout(300);
-  ok('選節展開目（第十六章第一節三目）', await p.$$eval('#pane-content .items.open .irow', e => e.length) === 3);
+  ok('選節展開目（第十六章第一節三目）', await p.$$eval('#bv-content .items.open .irow', e => e.length) === 3);
   await p.evaluate(() => KM.go('sec:7-3b')); await p.waitForTimeout(300);
   ok('第七章第三節下半屬同一章（第二輯）', (await pane(p)).includes('第七章') && (await pane(p)).includes('第二輯'));
+  await home(p); await p.waitForTimeout(800);
   await p.click('#tab-toc');
   const toc = await p.evaluate(() => ({ ch: document.querySelectorAll('#pane-toc details').length, rows: document.querySelectorAll('#pane-toc .trow').length }));
   ok('完整目次：17章、181節目＋8入口', toc.ch === 17 && toc.rows === 181 + 8, JSON.stringify(toc));
@@ -99,7 +103,7 @@ const { chromium } = require('playwright');
   await m.goto(url); await m.waitForFunction(() => window.__kmReady, null, { timeout: 90000 });
   ok('手機無橫向捲動', (await m.evaluate(() => document.documentElement.scrollWidth)) <= 390);
   await m.evaluate(() => KM.go('chapter:c14')); await m.waitForTimeout(500);
-  ok('手機每批5節', (await m.textContent('#pane-content')).includes('第 1–5 節／共 40 節'));
+  ok('手機每批5節', (await pane(m)).includes('第 1–5 節／共 40 節'));
   if (shots) await m.screenshot({ path: shots + '/m1.png' });
 
   await m.close();
@@ -109,7 +113,7 @@ const { chromium } = require('playwright');
   await f.goto(url); await f.waitForTimeout(1500);
   ok('3D 失效：顯示提示且目次可用', await f.isVisible('#gl-fail') && (await f.$$eval('#pane-toc .trow', e => e.length)) === 189);
   await f.evaluate(() => KM.go('sec:14-40'));
-  ok('3D 失效：仍可閱讀章節', (await f.textContent('#pane-content')).includes('第四十節'));
+  ok('3D 失效：仍可閱讀章節', (await pane(f)).includes('第四十節'));
 
   ok('無 JS 錯誤', errs.length === 0, errs.join(' | '));
   console.log(out.join('\n'));

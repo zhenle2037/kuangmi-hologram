@@ -109,6 +109,7 @@
     sel = s; if (s && (s.k === "bead" || s.k === "empty")) lastBead = s.n;
     renderPanel(); syncToc(); syncNav();
     if (has3D) window.KM3D.setSelection(s);
+    syncBeadView();
     if (opt.hash !== false) { try { history.replaceState(null, "", s ? "#" + hashOf(s) : mode === "book" ? "#book" : location.pathname + location.search); } catch (e) {} }
     if (opt.tab !== false) showTab("content");
   }
@@ -179,6 +180,7 @@
   }
   function renderPanel() {
     var el = $("#pane-content"), h = "";
+    if (isDetail(sel)) { el.innerHTML = '<p class="crumb">珠內閱讀</p><p class="pend">內容顯示於畫面中央的珠內。</p>'; return; }
     if (!sel && mode === "mala") {
       h = '<p class="crumb">以數珠為喻 ・ 總覽</p><h2>以數珠為喻</h2><p class="guide">點選任一數珠可查看相關名相主題。</p>' +
         "<p>點部件文字或念珠部件，可看導師引文中的對應譬喻；按「依四區查看名相」，念珠旁會改為標示見、修、行、果四區。上一珠／下一珠只在已配置名相的珠位間移動。</p>" +
@@ -248,6 +250,100 @@
     }
     el.innerHTML = h;
     el.scrollTop = 0;
+  }
+
+  /* ---------- 珠內閱讀：點珠後，文字直接寫在放大的珠內，左右露出相鄰珠 ---------- */
+  function isDetail(s) { return !!s && (s.k === "bead" || s.k === "empty" || s.k === "chapter" || s.k === "sec"); }
+  var texCache = {};
+  function beadTex(k) { // 珠面正視圖：細小清晰的星點，越近邊緣越扁（球面透視）
+    k = ((k % 6) + 6) % 6; if (texCache[k] != null) return texCache[k];
+    try {
+      var S = 900, c = document.createElement("canvas"); c.width = c.height = S; var g = c.getContext("2d"), seed = 97 + k * 131;
+      var rnd = function () { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
+      for (var i = 0; i < 620; i++) {
+        var rr = Math.sqrt(rnd()) * 0.985, a = rnd() * Math.PI * 2, x = S / 2 + Math.cos(a) * rr * S / 2, y = S / 2 + Math.sin(a) * rr * S / 2;
+        var sq = Math.sqrt(Math.max(0.04, 1 - rr * rr)), sz = (1.1 + Math.pow(rnd(), 2.2) * 2.6) * S / 900, d0 = Math.floor(70 + rnd() * 40), al = 0.75 + rnd() * 0.25;
+        g.save(); g.translate(x, y); g.rotate(a); g.scale(sq, 1);
+        var rg = g.createRadialGradient(0, 0, 0, 0, 0, sz * 1.4);
+        rg.addColorStop(0, "rgba(" + d0 + "," + Math.floor(d0 * 0.62) + "," + Math.floor(d0 * 0.38) + "," + al + ")");
+        rg.addColorStop(0.6, "rgba(" + (d0 + 25) + "," + Math.floor((d0 + 25) * 0.66) + "," + Math.floor((d0 + 25) * 0.42) + "," + al * 0.8 + ")");
+        rg.addColorStop(1, "rgba(190,150,110,0)");
+        g.fillStyle = rg; g.beginPath(); g.arc(0, 0, sz * 1.4, 0, Math.PI * 2); g.fill(); g.restore();
+      }
+      texCache[k] = c.toDataURL("image/png");
+    } catch (e) { texCache[k] = ""; }
+    return texCache[k];
+  }
+  function paintOrb(el, n, warm) {
+    var t = beadTex(n);
+    el.style.backgroundImage = "radial-gradient(circle at 36% 30%, rgba(255,255,255,.42), rgba(255,255,255,0) 42%), radial-gradient(circle at 50% 50%, rgba(0,0,0,0) 60%, rgba(120,90,55,.26) 100%)" + (t ? ", url(" + t + ")" : "");
+    el.style.backgroundColor = warm ? "#f2d3a2" : "#fbf6ec";
+    el.classList.toggle("warm", !!warm);
+  }
+  function neighborsOf(s) {
+    if (s.k === "chapter" || s.k === "sec") {
+      var cid = s.k === "chapter" ? s.id : secById[s.id].ch, i = CH_ORDER.indexOf(cid), L = CH_ORDER.length;
+      var pc = chById[CH_ORDER[(i - 1 + L) % L]], nc = chById[CH_ORDER[(i + 1) % L]];
+      return { n: CH_BEAD[cid], warm: true, prev: { n: CH_BEAD[pc.id], name: chLabel(pc) + " " + shortTitle(pc.title) }, next: { n: CH_BEAD[nc.id], name: chLabel(nc) + " " + shortTitle(nc.title) }, unit: "章" };
+    }
+    var n = s.n, lo = ASSIGNED.filter(function (m) { return m < n; }), hi = ASSIGNED.filter(function (m) { return m > n; });
+    var pn = lo.length ? lo[lo.length - 1] : ASSIGNED[ASSIGNED.length - 1], nn = hi.length ? hi[0] : ASSIGNED[0];
+    return { n: n, warm: !!BEADS[n].term, prev: { n: pn, name: termById[BEADS[pn].term].name }, next: { n: nn, name: termById[BEADS[nn].term].name }, unit: "顆" };
+  }
+  function detailHTML(s) {
+    var h = "";
+    if (s.k === "bead" || s.k === "empty") {
+      var b = BEADS[s.n], zn = D.zones[b.z];
+      h += '<p class="bv-crumb">以數珠為喻 ・ ' + esc(zn.name) + "區 ・ 第 " + b.pos + "／26 珠 ・ 環上 " + s.n + "／108</p>";
+      if (!b.term) return h + '<h1 id="bv-title">待配置珠位</h1><p class="bv-note">此珠位尚未配置名相，內容待補。</p><p class="bv-links">' + chip("zone:" + zn.idx, "查看「" + esc(zn.name) + "」區已配置名相") + "</p>";
+      var t = termById[b.term];
+      h += '<h1 id="bv-title">' + esc(t.name) + "</h1>";
+      if (t.show.length > 1) h += '<p class="bv-note">主珠位在「' + esc(t.group) + "」區；亦於「" + esc(t.show.filter(function (g) { return g !== t.group; }).join("、")) + "」區顯示，為同一份內容。</p>";
+      h += "<h2>內容</h2>";
+      h += t.body ? '<div class="prose">' + esc(t.body) + "</div>" : '<p class="pend">原書正文待補。</p>';
+      if (t.explanation) h += '<div class="prose">' + esc(t.explanation) + "</div>";
+      if (t.notes.length) h += '<ul class="bv-notes">' + t.notes.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ul>";
+      if (t.image) h += '<figure class="fig"><img src="' + esc(t.image) + '" alt="' + esc(t.imageCaption || "") + '" loading="lazy"><figcaption>' + esc(t.imageCaption || "") + "</figcaption></figure>";
+      h += "<h2>章節</h2>" + refList(t.refs) + '<p class="bv-note">〔直接〕詞語出現在該節／目標題；〔關聯〕為分類或合併上的關聯；〔僅章題〕僅章名出現。此為目次標題對照，不是正文逐字索引。</p>';
+      h += '<p class="bv-links">' + chip("zone:" + zn.idx, "查看「" + esc(zn.name) + "」區全部名相") + "</p>";
+      return h;
+    }
+    var sc = s.k === "sec" ? secById[s.id] : null, c = chById[sc ? sc.ch : s.id], parent = sc && sc.parent ? secById[sc.parent] : null;
+    h += '<p class="bv-crumb">原書導讀 ・ ' + chLabel(c) + " ・ " + volText(c.vols) + "</p>";
+    if (!sc) {
+      h += '<h1 id="bv-title"><small>' + chLabel(c) + "</small>" + esc(c.title) + "</h1>";
+      if (c.no === 7) h += '<p class="bv-note">第七章跨第一、二輯：第三節上半在第一輯、下半在第二輯，同屬一節。</p>';
+      if (c.no === 9) h += '<p class="bv-note">第九章跨第二、三輯：第二輯含第一至第六節，第三輯接續第七至第十一節，同屬一章。</p>';
+      h += "<h2>章節</h2>" + chapterBody(c, null);
+      var rt = termsOfChapter(c.id);
+      if (rt.length) h += "<h2>本章相關名相</h2><p class=\"bv-links\">" + rt.map(function (t) { return chip("bead:" + t.slot, esc(t.name)); }).join("") + "</p>";
+      h += "<h2>內容</h2>" + (c.body ? '<div class="prose">' + esc(c.body) + "</div>" : '<p class="pend">原書正文與整理說明待補。</p>');
+      return h;
+    }
+    h += '<h1 id="bv-title"><small>' + (parent ? secLabel(parent) + " " + esc(parent.title) + " ・ " : "") + secLabel(sc) + "</small>" + esc(sc.title) + "</h1>";
+    h += '<p class="bv-note">原書頁碼 ' + esc(sc.page) + " 頁 ・ " + VOLNAME(sc.vol) + "</p>";
+    if (sc.items && sc.items.length) h += '<h2>章節</h2><ol class="items open">' + sc.items.map(function (it) { return '<li><button class="irow" data-go="sec:' + it.id + '"><span class="sn">' + secLabel(it) + '</span><span class="st">' + esc(it.title) + '</span><span class="pg">' + esc(it.page) + "頁</span></button></li>"; }).join("") + "</ol>";
+    h += "<h2>內容</h2>" + (sc.body ? '<div class="prose">' + esc(sc.body) + "</div>" : '<p class="pend">原書正文與整理說明待補。</p>');
+    var rel = termsOfSec(sc.id);
+    if (rel.length) h += "<h2>相關名相</h2><p class=\"bv-links\">" + rel.map(function (t) { return chip("bead:" + t.slot, esc(t.name) + " <small>" + esc(t.group) + "區</small>"); }).join("") + "</p>";
+    h += '<p class="bv-links">' + chip("chapter:" + c.id, "‹ 回到" + chLabel(c) + "節次") + "</p>";
+    return h;
+  }
+  var bvTimer = null;
+  function syncBeadView() {
+    var v = $("#beadview");
+    if (!isDetail(sel)) { if (!v.hidden) { v.classList.remove("on"); clearTimeout(bvTimer); bvTimer = setTimeout(function () { v.hidden = true; }, 350); document.body.classList.remove("reading"); } return; }
+    var nb = neighborsOf(sel), wasOpen = !v.hidden && v.classList.contains("on");
+    var content = $("#bv-content");
+    content.innerHTML = detailHTML(sel); content.scrollTop = 0;
+    paintOrb($("#bv-orb"), nb.n, nb.warm);
+    paintOrb($("#bv-prev .bv-orb"), nb.prev.n, true); paintOrb($("#bv-next .bv-orb"), nb.next.n, true);
+    $("#bv-prev .bv-dir").textContent = "‹ 上一" + nb.unit; $("#bv-next .bv-dir").textContent = "下一" + nb.unit + " ›";
+    $("#bv-prev .bv-name").textContent = nb.prev.name; $("#bv-next .bv-name").textContent = nb.next.name;
+    $("#bv-prev").setAttribute("aria-label", "上一" + nb.unit + "：" + nb.prev.name); $("#bv-next").setAttribute("aria-label", "下一" + nb.unit + "：" + nb.next.name);
+    clearTimeout(bvTimer);
+    if (wasOpen) { v.classList.remove("swap"); void v.offsetWidth; v.classList.add("swap"); }
+    else { v.hidden = false; v.scrollLeft = v.scrollTop = 0; document.body.classList.add("reading"); bvTimer = setTimeout(function () { v.classList.add("on"); content.focus({ preventScroll: true }); }, has3D ? 650 : 20); }
   }
 
   /* ---------- 純文字目次（3D 失效時仍可完整閱讀） ---------- */
@@ -337,7 +433,9 @@
     setMode("mala", true); renderPanel(); syncNav();
     document.addEventListener("click", function (e) {
       var bt = e.target.closest("[data-batch]");
-      if (bt) { var pr = bt.getAttribute("data-batch").split(":"); batch[pr[0]] = (batch[pr[0]] || 0) + (+pr[1]) * batchSize(); renderPanel(); return; }
+      if (bt) { var pr = bt.getAttribute("data-batch").split(":"); batch[pr[0]] = (batch[pr[0]] || 0) + (+pr[1]) * batchSize(); renderPanel();
+        if (isDetail(sel)) { var bc = $("#bv-content"), keep = bc.scrollTop; bc.innerHTML = detailHTML(sel); bc.scrollTop = keep; var nb2 = bc.querySelector('[data-batch="' + pr[0] + ':' + pr[1] + '"]'); if (nb2 && !nb2.disabled) nb2.focus({ preventScroll: true }); }
+        return; }
       var t = e.target.closest("[data-go]"); if (!t) return;
       if (t.closest("summary")) e.preventDefault();
       go(t.getAttribute("data-go"));
@@ -351,6 +449,10 @@
     $("#prev").onclick = function () { step(-1); };
     $("#next").onclick = function () { step(1); };
     $("#home").onclick = function () { select(null); };
+    $("#bv-back").onclick = function () { select(null); };
+    $("#bv-prev").onclick = function () { step(-1); };
+    $("#bv-next").onclick = function () { step(1); };
+    $("#beadview").addEventListener("scroll", function () { this.scrollLeft = 0; this.scrollTop = 0; }); // 焦點移到半露的側珠時不讓畫面被捲動
     $("#mode-mala").onclick = function () { setMode("mala"); };
     $("#mode-book").onclick = function () { setMode("book"); };
     $("#zoneview").onclick = function () { if (sel) select(null); setZoneView(!zoneView); };

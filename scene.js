@@ -41,7 +41,7 @@
       renderer = new T.WebGLRenderer({ antialias: true, alpha: true });
     } catch (e) { return false; }
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    renderer.toneMapping = T.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.8; // 柔和高光，避免過曝
+    renderer.toneMapping = T.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.38; // 柔和高光，避免過曝
     renderer.shadowMap.enabled = true; renderer.shadowMap.type = T.PCFShadowMap; renderer.physicallyCorrectLights = false;
     host.appendChild(renderer.domElement);
 
@@ -52,7 +52,7 @@
     controls.minDistance = 8; controls.maxDistance = 140; controls.minPolarAngle = 0.3; controls.maxPolarAngle = 1.3;
     controls.rotateSpeed = 0.6;
 
-    scene.add(new T.HemisphereLight(0xfff8ee, 0xd8c8b0, 0.42));
+    scene.add(new T.HemisphereLight(0xfff6e8, 0xdcc8aa, 0.46));
     var dl = new T.DirectionalLight(0xfffaf2, 0.55); dl.position.set(-14, 60, 26); dl.castShadow = true;
     dl.shadow.mapSize.set(2048, 2048); dl.shadow.radius = 9; dl.shadow.bias = -0.0005;
     var sc = dl.shadow.camera; sc.left = sc.bottom = -45; sc.right = sc.top = 45; sc.near = 1; sc.far = 140; scene.add(dl);
@@ -90,38 +90,53 @@
     var c = document.createElement("canvas"), b = document.createElement("canvas"); c.width = b.width = w * K; c.height = b.height = h * K;
     var g = c.getContext("2d"), gb = b.getContext("2d"); g.scale(K, K); gb.scale(K, K);
     var grd = g.createLinearGradient(0, 0, 0, h);
-    grd.addColorStop(0, "#cdb898"); grd.addColorStop(0.1, "#eee3cf"); grd.addColorStop(0.5, "#f8f2e6"); grd.addColorStop(0.9, "#eee3cf"); grd.addColorStop(1, "#cdb898");
+    grd.addColorStop(0, "#d9cbb3"); grd.addColorStop(0.08, "#efe7da"); grd.addColorStop(0.5, "#fcf6ea"); grd.addColorStop(0.92, "#efe7da"); grd.addColorStop(1, "#d9cbb3");
     g.fillStyle = grd; g.fillRect(0, 0, w, h);
     gb.fillStyle = "#808080"; gb.fillRect(0, 0, w, h);
-    var i, x, y, rr, a;
-    for (i = 0; i < 2600; i++) { // 細微纖維紋理
-      x = r() * w; y = r() * h; a = r() * 0.06;
-      g.fillStyle = r() < 0.5 ? "rgba(255,250,235," + a + ")" : "rgba(150,115,70," + a + ")"; g.fillRect(x, y, 1 + r() * 3, 1);
-      gb.fillStyle = "rgba(" + (r() < 0.5 ? "255,255,255" : "0,0,0") + "," + a * 1.5 + ")"; gb.fillRect(x, y, 1 + r() * 3, 1);
+    var i, x, y, a;
+    for (i = 0; i < 4200; i++) { // 霧面細紋
+      x = r() * w; y = r() * h; a = r() * 0.045;
+      g.fillStyle = r() < 0.5 ? "rgba(255,253,248," + a + ")" : "rgba(160,130,95," + a + ")"; g.fillRect(x, y, 1 + r() * 2, 1);
+      gb.fillStyle = "rgba(" + (r() < 0.5 ? "255,255,255" : "0,0,0") + "," + a * 2 + ")"; gb.fillRect(x, y, 1 + r() * 2, 1);
     }
-    // 月：兩極穿孔周圍的凹陷環
-    [0, h].forEach(function (py) {
-      var mg = g.createLinearGradient(0, py, 0, py === 0 ? 34 : h - 34);
-      mg.addColorStop(0, "rgba(110,85,55,.45)"); mg.addColorStop(1, "rgba(110,80,45,0)"); g.fillStyle = mg; g.fillRect(0, py === 0 ? 0 : h - 34, w, 34);
+    [0, h].forEach(function (py) { // 月：穿孔周圍的凹環
+      var mg = g.createLinearGradient(0, py, 0, py === 0 ? 26 : h - 26);
+      mg.addColorStop(0, "rgba(140,105,70,.4)"); mg.addColorStop(1, "rgba(140,105,70,0)"); g.fillStyle = mg; g.fillRect(0, py === 0 ? 0 : h - 26, w, 26);
+      var bg2 = gb.createLinearGradient(0, py, 0, py === 0 ? 20 : h - 20); bg2.addColorStop(0, "rgba(0,0,0,.6)"); bg2.addColorStop(1, "rgba(0,0,0,0)"); gb.fillStyle = bg2; gb.fillRect(0, py === 0 ? 0 : h - 20, w, 20);
     });
-    // 星：深褐色小凹點，越靠兩極橫向拉長以抵銷投影
-    var N = 230 + Math.floor(r() * 60);
+    // 星：細小清晰的深褐凹點，靠兩極橫向拉長以抵銷投影
+    var N = 380 + Math.floor(r() * 120);
     for (i = 0; i < N; i++) {
-      y = h * (0.14 + r() * 0.72); x = r() * w;
-      var lat = Math.sin(Math.PI * y / h), sz = 1.4 + Math.pow(r(), 2) * 3.4, sx = sz / Math.max(0.3, lat);
-      var al = 0.55 + r() * 0.4, dark = Math.floor(55 + r() * 45);
+      y = h * (0.1 + r() * 0.8); x = r() * w;
+      var lat = Math.sin(Math.PI * y / h), sz = 0.7 + Math.pow(r(), 2.2) * 1.9, stretch = 1 / Math.max(0.3, lat);
+      var al = 0.82 + r() * 0.18, d0 = Math.floor(70 + r() * 35);
       [x, x - w, x + w].forEach(function (xx) {
-        if (xx < -sx * 2 || xx > w + sx * 2) return;
-        var rg = g.createRadialGradient(xx, y, 0, xx, y, sx);
-        rg.addColorStop(0, "rgba(" + dark + "," + Math.floor(dark * 0.72) + "," + Math.floor(dark * 0.5) + "," + al + ")");
-        rg.addColorStop(0.6, "rgba(" + (dark + 35) + "," + Math.floor((dark + 35) * 0.76) + "," + Math.floor((dark + 35) * 0.55) + "," + al * 0.5 + ")"); rg.addColorStop(1, "rgba(120,90,50,0)");
-        g.save(); g.translate(xx, y); g.scale(sx / sz, 1); g.translate(-xx, -y); g.fillStyle = rg; g.beginPath(); g.arc(xx, y, sz * 1.15, 0, TAU); g.fill(); g.restore();
-        gb.save(); gb.translate(xx, y); gb.scale(sx / sz, 1); gb.translate(-xx, -y); gb.fillStyle = "rgba(0,0,0,.75)"; gb.beginPath(); gb.arc(xx, y, sz * 0.9, 0, TAU); gb.fill(); gb.restore();
+        if (xx < -8 || xx > w + 8) return;
+        g.save(); g.translate(xx, y); g.scale(stretch, 1);
+        var rg = g.createRadialGradient(0, 0, 0, 0, 0, sz * 1.5);
+        rg.addColorStop(0, "rgba(" + d0 + "," + Math.floor(d0 * 0.62) + "," + Math.floor(d0 * 0.38) + "," + al + ")");
+        rg.addColorStop(0.55, "rgba(" + (d0 + 20) + "," + Math.floor((d0 + 20) * 0.66) + "," + Math.floor((d0 + 20) * 0.42) + "," + al * 0.85 + ")");
+        rg.addColorStop(1, "rgba(190,150,110,0)");
+        g.fillStyle = rg; g.beginPath(); g.arc(0, 0, sz * 1.5, 0, TAU); g.fill(); g.restore();
+        gb.save(); gb.translate(xx, y); gb.scale(stretch, 1); gb.fillStyle = "rgba(0,0,0,.85)"; gb.beginPath(); gb.arc(0, 0, sz * 1.1, 0, TAU); gb.fill(); gb.restore();
       });
     }
     var t1 = new T.CanvasTexture(c), t2 = new T.CanvasTexture(b);
     t1.anisotropy = t2.anisotropy = 8;
-    return { map: t1, bump: t2 };
+    return { map: t1, bump: t2, canvas: c };
+  }
+  function threadTexture(dir, base, dark) { // 絲線紋理：dir="h" 橫向纏繞、"v" 直向流蘇、"d" 斜向編繩
+    var c = document.createElement("canvas"); c.width = 256; c.height = 256; var g = c.getContext("2d"), r = rng(dir.charCodeAt(0) * 31);
+    g.fillStyle = base; g.fillRect(0, 0, 256, 256);
+    for (var i = 0; i < 256; i += 2) {
+      g.strokeStyle = "rgba(" + (r() < 0.5 ? "255,220,200," + (0.05 + r() * 0.12) : dark + "," + (0.15 + r() * 0.3)) + ")"; g.lineWidth = 1 + r();
+      g.beginPath();
+      if (dir === "h") { g.moveTo(0, i); g.lineTo(256, i + (r() - 0.5) * 2); }
+      else if (dir === "v") { g.moveTo(i, 0); g.lineTo(i + (r() - 0.5) * 3, 256); }
+      else { g.moveTo(i - 64, 0); g.lineTo(i + 64, 256); g.moveTo(i + 64, 0); g.lineTo(i - 64, 256); }
+      g.stroke();
+    }
+    var t = new T.CanvasTexture(c); t.wrapS = t.wrapT = T.RepeatWrapping; t.anisotropy = 8; return t;
   }
   function agateTexture() {
     var w = 512, h = 256, r = rng(77), c = document.createElement("canvas"); c.width = w; c.height = h;
@@ -153,7 +168,7 @@
     for (n = 1; n <= 107; n++) ANG[n] = ANG[n - 1 || 108] + (RAD[n - 1 || 108] + gap + RAD[n]) / R;
     var geoR = new T.SphereGeometry(RB, 48, 32), geoM = new T.SphereGeometry(RS, 48, 32), geoG = new T.SphereGeometry(RG, 64, 44);
     var BT = [11, 23, 37, 59, 71, 97].map(bodhiTextures), agate = agateTexture(), YA = new T.Vector3(0, 1, 0), r = rng(2024);
-    function bodhiMat(k) { var tx = BT[k % BT.length]; return new T.MeshPhysicalMaterial({ map: tx.map, bumpMap: tx.bump, bumpScale: 0.01, color: 0xffffff, emissive: 0xffe2b8, emissiveIntensity: 0, roughness: 0.58, metalness: 0, clearcoat: 0.25, clearcoatRoughness: 0.45, envMapIntensity: 0.32, transparent: true, opacity: 1 }); }
+    function bodhiMat(k) { var tx = BT[k % BT.length]; return new T.MeshPhysicalMaterial({ map: tx.map, bumpMap: tx.bump, bumpScale: 0.022, color: 0xffffff, emissive: 0xffe2b8, emissiveIntensity: 0, roughness: 0.8, metalness: 0, clearcoat: 0, envMapIntensity: 0.28, transparent: true, opacity: 1 }); }
     function agateMat() { return new T.MeshPhysicalMaterial({ map: agate, color: 0x9c7474, emissive: 0x3a0205, emissiveIntensity: 0, roughness: 0.05, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.02, envMapIntensity: 0.75, reflectivity: 0.8, transparent: true, opacity: 0.93, depthWrite: true }); }
     var agateCore = new T.MeshBasicMaterial({ color: 0x2c0104 }); // 內層透光，讓瑪瑙有深處的紅光
     for (n = 1; n <= 108; n++) {
@@ -173,43 +188,59 @@
       cands.push({ obj: grp, rad: n === 108 ? 1.3 : b.spacer ? 1.05 : 0.9, bead: o });
     }
     // 串繩（連續圓環，貫穿所有珠心）
-    var cordMat = new T.MeshStandardMaterial({ color: 0x3a070b, roughness: 0.9, envMapIntensity: 0.25 });
-    stringMesh = new T.Mesh(new T.TorusGeometry(R, 0.07, 8, 360), cordMat);
+    var cordMat = new T.MeshStandardMaterial({ color: 0x9e3a30, roughness: 0.85, envMapIntensity: 0.3 });
+    stringMesh = new T.Mesh(new T.TorusGeometry(R, 0.085, 10, 480), cordMat);
     stringMesh.rotation.x = Math.PI / 2; malaGroup.add(stringMesh);
     for (var i = 0; i < 128; i++) { var a = i / 128 * TAU; ringLocal.push(new T.Vector3(Math.sin(a) * R, 0, Math.cos(a) * R)); }
 
-    // 佛頭：第四隔珠（環上第 108 顆）兼作佛頭珠，其上加三通塔頭
+    // 佛頭：第四隔珠（環上第 108 顆）兼作佛頭珠；三層三通塔頭沿半徑水平朝外（90°）
     var towerMat = bodhiMat(5);
-    guru = new T.Group(); guru.position.set(0, RG - 0.06, R);
-    var tw = new T.Mesh(new T.CylinderGeometry(0.36, 0.5, 0.7, 40), towerMat); tw.position.y = 0.38; tw.castShadow = true; guru.add(tw);
-    var tr1 = new T.Mesh(new T.TorusGeometry(0.46, 0.07, 12, 40), towerMat); tr1.rotation.x = Math.PI / 2; tr1.position.y = 0.1; guru.add(tr1);
-    var tr2 = new T.Mesh(new T.TorusGeometry(0.37, 0.06, 12, 40), towerMat); tr2.rotation.x = Math.PI / 2; tr2.position.y = 0.66; guru.add(tr2);
-    var tc = new T.Mesh(new T.SphereGeometry(0.36, 32, 12, 0, TAU, 0, Math.PI / 2), towerMat); tc.scale.y = 0.6; tc.position.y = 0.72; guru.add(tc);
-    malaGroup.add(guru);
+    guru = new T.Group(); guru.position.set(0, 0, R + RG - 0.12); malaGroup.add(guru);
+    var tower = new T.Group(); tower.rotation.x = Math.PI / 2; guru.add(tower); // 幾何沿 y 建造，旋轉後指向 +z（外側）
+    var tiers = [[0.5, 0.46, 0.26], [0.42, 0.38, 0.24], [0.33, 0.29, 0.22]], yy = 0;
+    tiers.forEach(function (t, i) {
+      var m = new T.Mesh(new T.CylinderGeometry(t[1], t[0], t[2], 48), towerMat); m.position.y = yy + t[2] / 2; m.castShadow = true; tower.add(m);
+      var lip = new T.Mesh(new T.TorusGeometry(t[0] - 0.01, 0.045, 12, 48), towerMat); lip.rotation.x = Math.PI / 2; lip.position.y = yy + 0.02; tower.add(lip);
+      yy += t[2] + 0.035; // 層間細縫
+    });
+    var dome = new T.Mesh(new T.SphereGeometry(0.29, 32, 16, 0, TAU, 0, Math.PI / 2), towerMat); dome.scale.y = 0.55; dome.position.y = yy - 0.02; tower.add(dome);
+    var tipLocal = yy + 0.12;
     cands.push({ act: "part:head", obj: guru, rad: 0.9 });
-    // 飾穗：自塔頭頂端出繩，越過珠外緣後受重力垂下；結下分兩股，各串 6 顆中菩提子，尾端編繩
-    var knotMat = new T.MeshStandardMaterial({ color: 0x420910, roughness: 0.95, envMapIntensity: 0.25 });
-    var top = new T.Vector3(0, guru.position.y + 0.95, R);
-    var drop = new T.Vector3(0, top.y - 0.55, R + RG + 1.5); // 往外（遠離圓心）跨過珠緣
-    var c0 = new T.CubicBezierCurve3(top, new T.Vector3(0, top.y + 0.5, R + 0.4), new T.Vector3(0, top.y + 0.35, drop.z - 0.2), drop);
-    malaGroup.add(new T.Mesh(new T.TubeGeometry(c0, 40, 0.06, 8, false), knotMat));
-    tasselPivot = new T.Group(); tasselPivot.position.copy(drop); malaGroup.add(tasselPivot);
+    // 飾穗：自塔頭末端出繩，受重力垂下；結下兩股，各串 6 顆中菩提子，尾端為絲線流蘇繩頭
+    var redSilk = "#4a0a10", braid = threadTexture("d", redSilk, "20,0,4"); braid.repeat.set(1, 18);
+    var cordM = new T.MeshStandardMaterial({ color: 0xffffff, map: braid, roughness: 0.7, envMapIntensity: 0.35 });
+    var wrapT = threadTexture("h", redSilk, "25,0,5"); wrapT.repeat.set(1, 3);
+    var wrapM = new T.MeshStandardMaterial({ color: 0xffffff, map: wrapT, roughness: 0.5, envMapIntensity: 0.45 });
+    var fringeT = threadTexture("v", redSilk, "18,0,3"); fringeT.repeat.set(10, 1);
+    var fringeM = new T.MeshStandardMaterial({ color: 0xffffff, map: fringeT, roughness: 0.45, envMapIntensity: 0.5, side: T.DoubleSide });
+    var tip = new T.Vector3(0, 0, R + RG - 0.12 + tipLocal);
+    tasselPivot = new T.Group(); tasselPivot.position.copy(tip); malaGroup.add(tasselPivot);
     tassel = new T.Group(); tasselPivot.add(tassel);
-    var k1 = new T.Mesh(new T.TorusKnotGeometry(0.17, 0.065, 64, 10, 2, 3), knotMat); k1.position.y = -0.3; tassel.add(k1);
+    var hang = new T.CubicBezierCurve3(new T.Vector3(0, 0, -0.05), new T.Vector3(0, 0.05, 0.2), new T.Vector3(0, -0.15, 0.32), new T.Vector3(0, -0.55, 0.32));
+    tassel.add(new T.Mesh(new T.TubeGeometry(hang, 24, 0.055, 8, false), cordM));
+    var k1 = new T.Mesh(new T.TorusKnotGeometry(0.15, 0.06, 80, 10, 2, 3), cordM); k1.position.set(0, -0.68, 0.32); tassel.add(k1);
     var MB = 0.21; // 中菩提子
     [-1, 1].forEach(function (sd, si) {
-      var x0 = sd * 0.06, x1 = sd * 0.3, y0 = -0.5, yEnd = y0 - 0.25 - 6 * 2 * MB - 0.1;
-      var A = new T.Vector3(0, -0.42, 0), B = new T.Vector3(x1, yEnd, 0); // 兩股自結下略微分開，受重力幾乎垂直
-      tassel.add(new T.Mesh(new T.TubeGeometry(new T.LineCurve3(A, B), 8, 0.035, 6, false), knotMat));
-      for (var j = 0; j < 6; j++) { // 6 顆中菩提子沿繩依序相接垂掛
-        var yy = y0 - 0.05 - MB - j * 2 * MB, f = (yy - A.y) / (B.y - A.y);
-        var bm = new T.Mesh(new T.SphereGeometry(MB, 32, 24), bodhiMat(j + si * 3)); bm.position.set(A.x + (B.x - A.x) * f, yy, 0); bm.rotation.set(r() * 3, r() * 3, 0); bm.castShadow = true; tassel.add(bm);
+      var A = new T.Vector3(sd * 0.04, -0.82, 0.32), x1 = sd * 0.26, yTop = -0.95, yLast = yTop - MB - 5 * 2 * MB, yCap = yLast - MB - 0.28;
+      var B = new T.Vector3(x1, yCap, 0.32);
+      tassel.add(new T.Mesh(new T.TubeGeometry(new T.LineCurve3(A, B), 12, 0.035, 6, false), cordM));
+      for (var j = 0; j < 6; j++) {
+        var y1 = yTop - MB - j * 2 * MB, f = (y1 - A.y) / (B.y - A.y);
+        var bm = new T.Mesh(new T.SphereGeometry(MB, 32, 24), bodhiMat(j + si * 3)); bm.position.set(A.x + (B.x - A.x) * f, y1, 0.32); bm.rotation.set(r() * 3, r() * 3, 0); bm.castShadow = true; tassel.add(bm);
       }
-      var end = new T.Mesh(new T.CylinderGeometry(0.1, 0.13, 0.45, 16), knotMat); end.position.set(x1, yEnd - 0.2, 0); tassel.add(end);
-      var cap = new T.Mesh(new T.SphereGeometry(0.1, 12, 8), knotMat); cap.position.set(x1, yEnd + 0.03, 0); tassel.add(cap);
+      // 繩頭：編繩小結、纏線圓帽、束口、絲線流蘇（含散開的線尾）
+      var head = new T.Group(); head.position.set(x1, yCap, 0.32); tassel.add(head);
+      var sk = new T.Mesh(new T.TorusGeometry(0.075, 0.035, 10, 24), cordM); sk.rotation.x = Math.PI / 2; sk.position.y = 0.06; head.add(sk);
+      var capM = new T.Mesh(new T.SphereGeometry(0.17, 32, 24), wrapM); capM.scale.set(1, 0.9, 1); capM.position.y = -0.12; head.add(capM);
+      var collar = new T.Mesh(new T.CylinderGeometry(0.12, 0.14, 0.16, 32), wrapM); collar.position.y = -0.33; head.add(collar);
+      var band = new T.Mesh(new T.TorusGeometry(0.135, 0.02, 8, 32), cordM); band.rotation.x = Math.PI / 2; band.position.y = -0.4; head.add(band);
+      var FL = 1.35, fr = new T.Mesh(new T.CylinderGeometry(0.135, 0.26, FL, 64, 1, true), fringeM); fr.position.y = -0.41 - FL / 2; head.add(fr);
+      var frIn = new T.Mesh(new T.CylinderGeometry(0.11, 0.2, FL * 0.97, 32), fringeM); frIn.position.y = fr.position.y; head.add(frIn);
+      var lines = []; for (var q = 0; q < 140; q++) { var aq = r() * TAU, rq = 0.12 + r() * 0.13, yb = -0.41 - FL * (0.88 + r() * 0.12); lines.push(new T.Vector3(Math.cos(aq) * 0.12, -0.42, Math.sin(aq) * 0.12), new T.Vector3(Math.cos(aq) * rq * 1.05, yb, Math.sin(aq) * rq * 1.05)); }
+      head.add(new T.LineSegments(new T.BufferGeometry().setFromPoints(lines), new T.LineBasicMaterial({ color: 0x4a0a10, transparent: true, opacity: 0.7 })));
     });
     tassel.traverse(function (o) { if (o.isMesh) o.castShadow = true; });
-    var tbx = new T.Object3D(); tbx.position.set(0, -1.9, 0); tassel.add(tbx); tassel.userData.hit = tbx;
+    var tbx = new T.Object3D(); tbx.position.set(0, -2.2, 0.32); tassel.add(tbx); tassel.userData.hit = tbx;
     cands.push({ act: "part:tassel", obj: tbx, rad: 1.6 });
   }
   function angOf(n) { return ANG[((Math.round(n) - 1 + 108) % 108) + 1] + (n - Math.round(n)) * TAU / 108; }
@@ -280,7 +311,7 @@
     for (var n = 1; n <= 108; n++) {
       var b = beads[n], t = b.tgt;
       b.assigned = book ? !!KM.BEADS[n].ch : !!KM.BEADS[n].term;
-      if (!b.spacer) b.core.material.color.setHex(b.assigned ? 0xecdcc0 : 0xffffff); // 已配置：較深的蜜色；待配置：原色較淺
+      if (!b.spacer) b.core.material.color.setHex(b.assigned ? 0xf4d09a : 0xfff8ec); // 已配置：較深的蜜色；待配置：原色較淺
       if (b.spacer) { t.op = 1; t.em = 0.6; t.wo = 0; t.go = 0; }
       else if (b.assigned) { t.op = 1; t.em = 0.6; t.wo = 0; t.go = 0; }
       else { t.op = 1; t.em = 0.6; t.wo = 0; t.go = 0; }
@@ -326,7 +357,7 @@
     else if (sel && sel.k === "part" && (sel.id === "head" || sel.id === "tassel")) rotTo = 0;
     if (fb) { camTo = new T.Vector3(0, 6.5, R + 13); tgtTo = new T.Vector3(0, 0, R); }
     else if (sel && sel.k === "zone") { camTo = new T.Vector3(0, 16 * f, R + 28 * f); tgtTo = new T.Vector3(0, 0, R - 5); }
-    else if (sel && sel.k === "part" && (sel.id === "head" || sel.id === "tassel")) { camTo = new T.Vector3(0, 5.5, R + 15); tgtTo = new T.Vector3(0, 0.2, R + 0.8); }
+    else if (sel && sel.k === "part" && (sel.id === "head" || sel.id === "tassel")) { camTo = new T.Vector3(6, 3.5, R + 13); tgtTo = new T.Vector3(0, -1.2, R + 1.4); }
     else { camTo = overviewPos(); tgtTo = new T.Vector3(0, 0, 0); }
     G.killTweensOf(camera.position); G.killTweensOf(controls.target); if (rotTween) rotTween.kill();
     controls.enabled = false;
@@ -471,6 +502,7 @@
 
   /* ---------- 對外 ---------- */
   API.setPaused = function (v) { paused = !!v; };
+  API.beadTextureURL = function (k) { try { return bodhiTextures([11, 23, 37, 59, 71, 97][k % 6]).canvas.toDataURL("image/jpeg", 0.85); } catch (e) { return ""; } };
   API.setMode = function (m, zoneView) {
     if (!built) return;
     mode = m; labelSet = m === "book" ? "book" : zoneView ? "zones" : "parts";
@@ -491,9 +523,9 @@
       out.axisErr = Math.max(out.axisErr, Math.abs(Math.hypot(P[n].x, P[n].z) - R));
     }
     for (var m = 1; m <= 108; m++) { var m2 = m % 108 + 1; out.minGap = Math.min(out.minGap, P[m].distanceTo(P[m2]) - beads[m].r - beads[m2].r); }
-    out.guruAbove = guru.position.y > 0.5 && Math.hypot(guru.position.x - P[108].x, guru.position.z - P[108].z) < 0.01; // 三通塔頭在第四隔珠正上方
+    out.guruAbove = Math.abs(guru.position.y) < 0.01 && Math.abs(guru.position.x - P[108].x) < 0.01 && guru.position.z > P[108].z + RG * 0.8; // 三通塔頭自第四隔珠沿半徑水平朝外
     out.headIsSpacer108 = beads[108].spacer && RAD[108] > RS;
-    var tw = new T.Vector3(); tassel.userData.hit.getWorldPosition(tw); malaGroup.worldToLocal(tw); out.tasselHangs = tw.y < guru.position.y && Math.hypot(tw.x, tw.z) > R + RG; // 飾穗垂在珠外緣下方
+    var tw = new T.Vector3(); tassel.userData.hit.getWorldPosition(tw); malaGroup.worldToLocal(tw); out.tasselHangs = tw.y < -1 && Math.hypot(tw.x, tw.z) > R + RG; // 飾穗垂在珠外緣下方
     out.strings = malaGroup.children.filter(function (c) { return c === stringMesh; }).length;
     out.rotY = malaGroup.rotation.y; out.cam = camera.position.toArray();
     return out;
