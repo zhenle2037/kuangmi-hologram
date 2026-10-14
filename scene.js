@@ -254,22 +254,41 @@
   function buildHulls() { // 見修行果四區的半透明罩體：沿圓弧包住每區 26 顆數珠，像一段磨砂琉璃
     var TINT = [0x5f95cc, 0xd6a03c, 0x8e78d0, 0xd2685d];
     D.zones.forEach(function (zn, zi) {
-      var a0 = ANG[zn.first], a1 = ANG[zn.last], pts = [], k, HR = 0.86; // 罩體不碰到兩端隔珠
-      for (k = 0; k <= 64; k++) { var a = a0 + (a1 - a0) * k / 64; pts.push(new T.Vector3(Math.sin(a) * R, 0, Math.cos(a) * R)); }
-      var curve = new T.CatmullRomCurve3(pts), g = new T.Group();
+      var HR = 0.86, g = new T.Group(), runs = zoneRuns(zi);
       var outer = new T.MeshPhysicalMaterial({ color: TINT[zi], transparent: true, opacity: 0.17, roughness: 0.22, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.08, envMapIntensity: 1.5, depthWrite: false, side: T.FrontSide, emissive: TINT[zi], emissiveIntensity: 0.12 });
       var inner = new T.MeshPhysicalMaterial({ color: TINT[zi], transparent: true, opacity: 0.07, roughness: 0.5, depthWrite: false, side: T.BackSide });
       outer.onBeforeCompile = function (sh) { // 琉璃邊緣：越靠輪廓越不透明，形成柔和的玻璃邊光
         sh.fragmentShader = sh.fragmentShader.replace("#include <dithering_fragment>", "#include <dithering_fragment>\n float fres = pow(1.0 - abs(dot(normalize(vViewPosition), normal)), 2.2);\n gl_FragColor.rgb = mix(gl_FragColor.rgb, gl_FragColor.rgb * 0.82, fres);\n gl_FragColor.a = clamp(opacity * (0.55 + 3.2 * fres), 0.0, 0.85);");
       };
-      [[outer, HR], [inner, HR * 0.985]].forEach(function (m) {
-        g.add(new T.Mesh(new T.TubeGeometry(curve, 160, m[1], 40, false), m[0]));
-        [pts[0], pts[pts.length - 1]].forEach(function (pp) { var cap = new T.Mesh(new T.SphereGeometry(m[1], 40, 24), m[0]); cap.position.copy(pp); g.add(cap); });
+      // 只罩住已配置名相的珠段（空白珠不罩），另以同色琉璃泡罩住該區的隔珠
+      runs.forEach(function (rn) {
+        var a0 = ANG[rn[0]], a1 = ANG[rn[1]], pts = [], k;
+        for (k = 0; k <= 48; k++) { var a = a0 + (a1 - a0) * k / 48; pts.push(new T.Vector3(Math.sin(a) * R, 0, Math.cos(a) * R)); }
+        var curve = new T.CatmullRomCurve3(pts);
+        [[outer, HR], [inner, HR * 0.985]].forEach(function (m) {
+          if (rn[0] !== rn[1]) g.add(new T.Mesh(new T.TubeGeometry(curve, 120, m[1], 40, false), m[0]));
+          [pts[0], pts[pts.length - 1]].forEach(function (pp) { var cap = new T.Mesh(new T.SphereGeometry(m[1], 40, 24), m[0]); cap.position.copy(pp); g.add(cap); });
+        });
       });
+      var spN = zn.spacerNo, spA = ANG[spN], spR = RAD[spN] + 0.26;
+      [[outer, spR], [inner, spR * 0.985]].forEach(function (m) { var b = new T.Mesh(new T.SphereGeometry(m[1], 48, 32), m[0]); b.position.set(Math.sin(spA) * R, 0, Math.cos(spA) * R); g.add(b); });
       g.userData = { zone: zi, outer: outer, base: 0.17 }; g.renderOrder = 2; g.visible = false;
       g.traverse(function (o) { o.userData.zone = zi; o.renderOrder = 2; });
       malaGroup.add(g); hulls[zi] = g;
     });
+  }
+  function zoneSpan(zi) { // 區畫面要置中的角度範圍：已配置名相的第一顆到最後一顆（沒有則整區）
+    var zn = D.zones[zi], rs = zoneRuns(zi);
+    if (!rs.length) return [ANG[zn.first], ANG[zn.last]];
+    return [ANG[rs[0][0]], ANG[rs[rs.length - 1][1]]];
+  }
+  function zoneRuns(zi) { // 該區已配置名相的連續珠段
+    var zn = D.zones[zi], runs = [], st = null;
+    for (var n = zn.first; n <= zn.last + 1; n++) {
+      var on = n <= zn.last && !!KM.BEADS[n].term;
+      if (on && st == null) st = n; if (!on && st != null) { runs.push([st, n - 1]); st = null; }
+    }
+    return runs;
   }
   function syncHulls() {
     var on = labelSet === "terms" && !reading;
@@ -423,6 +442,7 @@
     var f = Math.max(1, 1.45 / aEff());
     var fb = focusBead(sel);
     if (fb) rotTo = -angOf(fb);
+    else if (sel && sel.k === "zone" && labelSet === "terms") { var zr = zoneSpan(sel.z); rotTo = -(zr[0] + zr[1]) / 2; } // 有內容的珠段置中
     else if (sel && sel.k === "zone") rotTo = -(ANG[D.zones[sel.z].first] + (ANG[D.zones[sel.z].spacerNo] || TAU)) / 2; // 第 108 顆的角度為 0，視為 2π
     else if (sel && sel.k === "part" && (sel.id === "head" || sel.id === "tassel")) rotTo = 0;
     if (fb && reading) { // 鏡頭正對被點的珠，使它在畫面中放大到可容納文字的大小
@@ -431,7 +451,7 @@
       camTo = new T.Vector3(0, dist * 0.07, R + dist); tgtTo = new T.Vector3(0, 0, R);
     } else if (fb) { camTo = new T.Vector3(0, 6.5, R + 13); tgtTo = new T.Vector3(0, 0, R); }
     else if (sel && sel.k === "zone" && labelSet === "terms") { // 區畫面：正面看這一區，整排數珠橫在畫面中
-      var zn = D.zones[sel.z], half = ((ANG[zn.spacerNo] || TAU) - ANG[zn.first]) / 2 + 0.02, chord = 2 * R * Math.sin(half), sag = R * (1 - Math.cos(half));
+      var zs = zoneSpan(sel.z), half = (zs[1] - zs[0]) / 2 + (RB + 0.5) / R, chord = 2 * R * Math.sin(half), sag = R * (1 - Math.cos(half));
       var availW2 = W - (narrow ? 0 : 2 * offX), dz = chord * (H / 2) / (Math.tan(FOV * Math.PI / 360) * availW2 * 0.94) + sag * 0.5;
       camTo = new T.Vector3(0, dz * 0.12, R + dz - sag * 0.3); tgtTo = new T.Vector3(0, 0, R - sag * 0.4);
     }

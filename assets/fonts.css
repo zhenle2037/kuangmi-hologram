@@ -1,0 +1,3 @@
+/* 思源宋體 Noto Serif TC（SIL Open Font License 1.1，見 assets/LICENSE-fonts.txt），僅保留本站用到的字 */
+@font-face{font-family:'Noto Serif TC Site';font-style:normal;font-weight:400;font-display:swap;src:url(fonts/noto-serif-tc-site-400.woff2) format('woff2')}
+@font-face{font-family:'Noto Serif TC Site';font-style:normal;font-weight:700;font-display:swap;src:url(fonts/noto-serif-tc-site-700.woff2) format('woff2')}
