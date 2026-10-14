@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>數珠網站管理</title>
+<link rel="stylesheet" href="../assets/fonts.css">
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+<header class="bar">
+  <h1>數珠網站管理 <small>《狂密與真密》以數珠為喻</small></h1>
+  <div class="who" id="who"></div>
+</header>
+<div id="notice" class="notice" hidden></div>
+<main id="app"><p class="muted">載入中…</p></main>
+<script src="../assets/config.js"></script>
+<script>
+  // 依設定載入 supabase-js（固定版本）；未設定時顯示設定說明
+  (function () {
+    var C = window.KM_CONFIG || {};
+    var s = document.createElement("script");
+    s.src = C.supabaseJs || "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js";
+    s.onload = function () { var a = document.createElement("script"); a.src = "admin.js"; document.body.appendChild(a); };
+    s.onerror = function () { document.getElementById("app").textContent = "無法載入 Supabase 程式庫，請檢查網路。"; };
+    if (window.supabase && window.supabase.createClient) s.onload(); else document.body.appendChild(s);
+  })();
+</script>
+</body>
+</html>

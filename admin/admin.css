@@ -1,0 +1,57 @@
+:root{--fg:#2b2521;--mut:#7d7064;--line:#e3d9cb;--bg:#f6f1e8;--card:#fffdf9;--acc:#9b2226;--ok:#2f6b3a;--warn:#a8741a}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.6 "Noto Serif TC Site","Noto Serif TC","Songti TC","PMingLiU",serif}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;border:1px solid var(--line);background:#fff;border-radius:6px;padding:5px 12px;min-height:34px}
+button:hover{border-color:var(--acc)}
+button.primary{background:var(--acc);border-color:var(--acc);color:#fff}
+button.danger{color:var(--acc)}
+button:disabled{opacity:.45;cursor:default}
+input,select,textarea{border:1px solid var(--line);border-radius:6px;padding:5px 8px;background:#fff;width:100%}
+textarea{min-height:90px;resize:vertical}
+label{display:block;font-size:13px;color:var(--mut);margin:.7em 0 .2em}
+.bar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 20px;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+.bar h1{margin:0;font-size:18px;letter-spacing:.1em}.bar h1 small{font-size:12px;color:var(--mut);margin-left:8px;letter-spacing:0}
+.who{display:flex;gap:8px;align-items:center;font-size:13px;flex-wrap:wrap}
+.role{padding:1px 8px;border-radius:10px;background:#efe5d6;font-size:12px}
+.notice{margin:10px 20px;padding:8px 12px;border-radius:6px;background:#fff5e6;border:1px solid #edd3a8}
+.notice.err{background:#fdecec;border-color:#e8b4b4;color:#7a1c1f}
+.notice.ok{background:#eaf5ec;border-color:#b7d8bd;color:var(--ok)}
+main{padding:12px 20px 60px}
+.tabs{display:flex;gap:4px;flex-wrap:wrap;border-bottom:1px solid var(--line);margin-bottom:14px}
+.tabs button{border:0;border-bottom:3px solid transparent;border-radius:0;background:none;padding:8px 14px}
+.tabs button[aria-selected=true]{border-bottom-color:var(--acc);color:var(--acc);font-weight:700}
+.cols{display:grid;grid-template-columns:320px 1fr;gap:18px;align-items:start}
+@media (max-width:860px){.cols{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:14px 16px}
+.list{max-height:70vh;overflow:auto;margin-top:8px}
+.list button{display:flex;gap:8px;width:100%;text-align:left;border:0;border-bottom:1px solid var(--line);border-radius:0;background:none;padding:6px 4px}
+.list button.on{background:#f3e7e2}
+.list .n{color:var(--mut);min-width:2.6em;font-size:13px}
+.list .arch{color:var(--mut);text-decoration:line-through}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.row>*{flex:1}
+.row .fix{flex:0 0 auto}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
+.checks{display:flex;gap:14px;flex-wrap:wrap}
+.checks label{display:flex;gap:4px;align-items:center;margin:0;color:var(--fg);font-size:15px}
+.checks input{width:auto}
+.refs .ref{display:grid;grid-template-columns:90px 1fr 1.4fr auto;gap:6px;align-items:start;padding:6px 0;border-bottom:1px dashed var(--line)}
+.refs .ref textarea{min-height:38px}
+.refs .ref .btns{display:flex;gap:2px}.refs .ref .btns button{padding:2px 6px;min-height:28px}
+@media (max-width:860px){.refs .ref{grid-template-columns:1fr}}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;position:sticky;bottom:0;background:var(--card);padding:10px 0;border-top:1px solid var(--line)}
+.muted{color:var(--mut)}.small{font-size:13px}
+.zone{margin:0 0 18px}
+.zone h3{margin:.2em 0 .5em;font-size:16px}
+.beads{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px}
+.bead{border:1px solid var(--line);border-radius:8px;background:#fff;padding:6px 8px;text-align:left;min-height:54px;display:flex;flex-direction:column;align-items:flex-start}
+.bead small{color:var(--mut)}.bead.empty{background:#faf7f1;color:var(--mut)}.bead.spacer{background:#f6e3e3;border-color:#e4b9b9}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{border-bottom:1px solid var(--line);padding:6px 6px;text-align:left;vertical-align:top}
+th{font-size:13px;color:var(--mut);font-weight:400}
+.diff li{margin:.2em 0}.diff .add{color:var(--ok)}.diff .del{color:var(--acc)}.diff .chg{color:var(--warn)}
+.conflict{border:1px solid #e8b4b4;background:#fdecec;border-radius:6px;padding:10px 12px;margin:10px 0}
+.badge{display:inline-block;font-size:12px;padding:0 6px;border-radius:4px;border:1px solid currentColor}
+.login{max-width:420px;margin:40px auto}
+.login button{width:100%;margin:.4em 0}

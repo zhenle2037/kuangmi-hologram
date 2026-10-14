@@ -30,5 +30,5 @@
 - 驗證：`NODE_PATH=$(npm root -g) node tools/verify.cjs file://$PWD/index.html <截圖資料夾>`
 
 ## 尚未做到
-- 線上管理後台（登入、授權他人編輯、草稿／發布／版本）：GitHub Pages 只能放靜態檔案，無法提供登入與資料庫。目前修改內容請改 `data/content.js` 後推上 GitHub。
+- 線上管理後台在 `admin/`（Supabase 登入、Owner／Editor 權限、草稿／發布／版本還原、操作紀錄）。需先依 [docs/後台設定說明.md](docs/後台設定說明.md) 建立 Supabase 專案並填入 `assets/config.js`；未設定前網站使用內建 `data/content.js`。
 - 原書正文、整理解說、原書圖片待補。

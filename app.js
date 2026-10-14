@@ -430,6 +430,11 @@
 
   function goBack() { var b = backSel; select(isDetail(sel) && b ? b : null); }
   function init() {
+    if (D.site) { // 後台可修改的網站標題與副標
+      var h1 = $(".top h1"); if (h1 && D.site.title) { h1.firstChild.nodeValue = D.site.title; }
+      var sp = $(".top h1 span"); if (sp && D.site.subtitle) sp.textContent = D.site.subtitle;
+      if (D.site.title) document.title = D.site.title + (D.site.subtitle ? " — " + D.site.subtitle.replace(/[《》]/g, "") : "");
+    }
     initQuote();
     buildToc();
     $("#partbar").innerHTML = PART_KEYS.map(function (kk) { return '<button type="button" data-go="part:' + kk + '">' + esc(D.parts[kk].title) + "</button>"; }).join("") +

@@ -4642,37 +4642,37 @@ window.KM_DATA = {
   {
    "id": "appendix-1-1",
    "title": "附錄一 參考書目",
-   "volume": 1,
+   "vol": 1,
    "page": "附一~附九"
   },
   {
    "id": "appendix-1-2",
    "title": "附錄二 手印指節示意圖",
-   "volume": 1,
+   "vol": 1,
    "page": "附十"
   },
   {
    "id": "appendix-2",
    "title": "附錄 參考書目",
-   "volume": 2,
+   "vol": 2,
    "page": "附一~附九"
   },
   {
    "id": "appendix-3",
    "title": "附錄 參考書目",
-   "volume": 3,
+   "vol": 3,
    "page": "附一~附九"
   },
   {
    "id": "postscript",
    "title": "跋",
-   "volume": 4,
+   "vol": 4,
    "page": "一三八四"
   },
   {
    "id": "appendix-4",
    "title": "附錄 參考書目",
-   "volume": 4,
+   "vol": 4,
    "page": "附一~附九"
   }
  ]
