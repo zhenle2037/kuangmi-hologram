@@ -303,3 +303,16 @@ body.mode-terms #leaders path{opacity:.55}
 .lab-part b{color:#1f1b18!important}
 .bv-side{background:none!important}
 .bv-side .bv-name,.bv-side .bv-dir{color:#1f1b18;text-shadow:0 0 3px rgba(250,247,240,.95),0 0 8px rgba(250,247,240,.8)}
+
+/* ===== 以數珠為喻：導師引文以「透明立體碑文」直書置於念珠中央（全文展開、無底色） ===== */
+@media (min-width:901px){
+  body.mode-mala #main-quote{left:var(--qx,40%);top:var(--qy,50%);bottom:auto;width:max-content;max-width:none;height:var(--qh,300px);padding:0;
+    background:none;border:0;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none;transform:translate(-50%,-50%) perspective(1100px) rotateX(12deg);transform-origin:50% 60%;pointer-events:none}
+  body.mode-mala #main-quote #quote,body.mode-mala #quote-toggle{display:none}
+  body.mode-mala #main-quote #quote-full{position:static!important;width:auto;height:100%;overflow:visible;clip:auto;white-space:normal;margin:0;
+    writing-mode:vertical-rl;font-size:clamp(14px,1.1vw,17px);line-height:1.75;letter-spacing:.06em;color:rgba(52,38,28,.86);text-align:start;user-select:text;pointer-events:auto;
+    text-shadow:1px 1px 0 rgba(255,255,255,.85),-1px -1px 0 rgba(90,60,35,.14),0 0 14px rgba(250,247,240,.9)}
+  body.mode-mala #main-quote.hide{opacity:0}
+}
+@media (max-width:900px){ body.mode-mala #main-quote #quote,body.mode-mala #quote-toggle{display:none} body.mode-mala #main-quote #quote-full{position:static!important;width:auto;height:auto;overflow:visible;clip:auto;white-space:normal;font-size:17px;line-height:1.9} }
+.lab-parts.lab-sp{font-size:17px;letter-spacing:.24em}

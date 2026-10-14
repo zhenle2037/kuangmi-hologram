@@ -72,6 +72,7 @@
   function actForBead(bn) {
     var b = BEADS[bn];
     if (mode === "book") return b.ch ? "chapter:" + b.ch : null;
+    if (mode === "terms" && !b.spacer && !b.term) return null; // 名相頁：空白珠不可點
     if (b.spacer) return "spacer:" + b.z;
     return b.term ? "bead:" + bn : "empty:" + bn;
   }
@@ -119,7 +120,7 @@
   }
   function setMode(m, quiet) { // 三個頁面：mala＝導師引文部件、terms＝見修行果四區名相、book＝原書章節
     mode = m;
-    document.body.classList.toggle("mode-book", m === "book"); document.body.classList.toggle("mode-terms", m === "terms");
+    document.body.classList.toggle("mode-book", m === "book"); document.body.classList.toggle("mode-terms", m === "terms"); document.body.classList.toggle("mode-mala", m === "mala");
     ["mala", "terms", "book"].forEach(function (k) { $("#mode-" + k).setAttribute("aria-pressed", m === k); });
     if (has3D) window.KM3D.setMode(m);
     if (!quiet) select(null);
@@ -344,7 +345,7 @@
     if (!isDetail(sel) || !has3D) { if (!v.hidden) { v.classList.remove("on"); clearTimeout(bvTimer); bvTimer = setTimeout(function () { v.hidden = true; }, 400); } return; }
     var nb = neighborsOf(sel), wasOpen = !v.hidden && v.classList.contains("on");
     var content = $("#bv-content");
-    $("#bv-prev .bv-dir").textContent = "‹ 上一" + nb.unit; $("#bv-next .bv-dir").textContent = "下一" + nb.unit + " ›";
+    $("#bv-prev .bv-dir").textContent = "上一" + nb.unit + " ›"; $("#bv-next .bv-dir").textContent = "‹ 下一" + nb.unit; // 順時針閱讀：下一顆在左、上一顆在右
     $("#bv-prev .bv-name").textContent = nb.prev.name; $("#bv-next .bv-name").textContent = nb.next.name;
     $("#bv-prev").setAttribute("aria-label", "上一" + nb.unit + "：" + nb.prev.name); $("#bv-next").setAttribute("aria-label", "下一" + nb.unit + "：" + nb.next.name);
     clearTimeout(bvTimer);
@@ -450,8 +451,9 @@
     });
     document.addEventListener("keydown", function (e) {
       if (/INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return;
-      if (e.key === "ArrowRight") step(1);
-      else if (e.key === "ArrowLeft") step(-1);
+      var rd = document.body.classList.contains("reading"); // 珠內閱讀時，左鍵＝下一顆、右鍵＝上一顆（與畫面左右一致）
+      if (e.key === "ArrowRight") step(rd ? -1 : 1);
+      else if (e.key === "ArrowLeft") step(rd ? 1 : -1);
       else if (e.key === "Escape") goBack();
     });
     $("#prev").onclick = function () { step(-1); };

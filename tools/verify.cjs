@@ -48,9 +48,9 @@ const { chromium } = require('playwright');
   ok('17章各配1顆普通數珠', d.chBeads === 17);
   const Q = '以數珠為喻：西藏密宗乃是以種種虛構之觀想法、持外道咒、天瑜伽、遷識⋯等外道法為數珠，以風瑜伽為隔珠，以佛教教相及僧寶表相為佛頭珠；以自己所定義之般若中觀名相及果位修證名相，作為佛頭珠所懸之飾穗，最後以淫樂之樂空雙運欲界外道雙身法為串繩，貫串密宗之一切成佛理論與行門。如是串成之數珠，即是西藏密教之真實宗義。－－平實導師－－';
   ok('引文逐字一致', d.quote === Q);
-  ok('引文預設只顯示開頭', (await p.textContent('#quote')).length < 60);
-  await p.click('#quote-toggle'); ok('點選展開完整引文與署名', (await p.textContent('#quote')) === Q); await p.click('#quote-toggle');
-  ok('總覽顯示5個部件文字', await p.evaluate(() => [...document.querySelectorAll('.lab-parts')].filter(e => e.style.display !== 'none').length) === 5);
+  ok('以數珠為喻頁：引文全文展開於念珠中央（碑文）', await p.isVisible('#quote-full') && (await p.textContent('#quote-full')) === Q && !(await p.isVisible('#quote-toggle')));
+  ok('以數珠為喻頁：標出四顆隔珠標題', await p.evaluate(() => [...document.querySelectorAll('.lab-parts.lab-sp')].filter(e => e.style.display !== 'none').length) === 4);
+  ok('總覽顯示5個部件文字', await p.evaluate(() => [...document.querySelectorAll('.lab-parts.lab-part')].filter(e => e.style.display !== 'none').length) === 5);
   if (shots) await p.screenshot({ path: shots + '/d1-overview.png' });
 
   const c5 = await p.evaluate(() => KM3D.screenOf(5)); await p.mouse.click(c5.x, c5.y);
