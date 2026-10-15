@@ -56,8 +56,13 @@ function Install-KuangmiBackend {
   Say '1/7 檢查 Token'
   $r = Call 'GET' '/organizations' $null
   if ($r.Code -ne 200) { Fail ("Token 無效（HTTP " + $r.Code + "）：" + $r.Body) }
-  $orgs = @($r.Data)
-  if ($orgs.Count -eq 0) { Fail '你的 Supabase 帳號還沒有組織（Organization）。請先到 https://supabase.com/dashboard 依畫面建立一個（選 Free），再重跑這個指令。' }
+  $orgs = @($r.Data | Where-Object { $_ })
+  if ($orgs.Count -eq 0) {
+    Write-Host '  帳號還沒有組織（Organization），自動建立一個免費組織 kuangmi…'
+    $r = Call 'POST' '/organizations' @{ name = 'kuangmi' }
+    if (-not (Ok $r)) { Fail ("自動建立組織失敗（HTTP " + $r.Code + "）：" + $r.Body + "`n請到 https://supabase.com/dashboard/new 手動建立一個組織（Plan 選 Free），再重跑這個指令。") }
+    $orgs = @($r.Data)
+  }
   $ORG = if ($orgs[0].slug) { $orgs[0].slug } else { $orgs[0].id }
   Write-Host "  組織：$ORG"
 

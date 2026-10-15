@@ -41,7 +41,13 @@ say "1/7 檢查 Token"
 call GET /organizations
 [ "$CODE" = 200 ] || fail "Token 無效（HTTP $CODE）：$BODY"
 ORG=$(echo "$BODY" | J 'print(d[0].get("slug") or d[0]["id"]) if d else print("")')
-[ -n "$ORG" ] || fail "你的 Supabase 帳號還沒有組織（Organization）。請先到 https://supabase.com/dashboard 依畫面建立一個（選 Free），再重跑這個指令。"
+if [ -z "$ORG" ]; then
+  echo "  帳號還沒有組織（Organization），自動建立一個免費組織 kuangmi…"
+  call POST /organizations '{"name":"kuangmi"}'
+  [ "$CODE" = 201 ] || [ "$CODE" = 200 ] || fail "自動建立組織失敗（HTTP $CODE）：$BODY
+請到 https://supabase.com/dashboard/new 手動建立一個組織（Plan 選 Free），再重跑這個指令。"
+  ORG=$(echo "$BODY" | J 'print(d.get("slug") or d["id"])')
+fi
 echo "  組織：$ORG"
 
 say "2/7 建立專案 $NAME（東京機房）"
