@@ -311,3 +311,38 @@ body.mode-terms #leaders path{opacity:.55}
 @media (max-width:900px){ body.mode-mala #main-quote #quote,body.mode-mala #quote-toggle{display:none} body.mode-mala #main-quote #quote-full{position:static!important;width:auto;height:auto;overflow:visible;clip:auto;white-space:normal;font-size:17px;line-height:1.9} }
 .lab-parts.lab-sp{font-size:17px;letter-spacing:.24em}
 .lab-parts.lab-part{max-width:200px}
+
+/* ===== 原書導讀：平實導師題辭，直書碑文置於念珠中央，兩段輪流淡入淡出 ===== */
+body.mode-book #main-quote{display:none}
+#book-stele{display:none}
+body.mode-book #book-stele{display:grid}
+#book-stele .verse{grid-area:1/1;margin:0;color:rgba(52,38,28,.88);user-select:text;
+  text-shadow:1px 1px 0 rgba(255,255,255,.85),-1px -1px 0 rgba(90,60,35,.14),0 0 14px rgba(250,247,240,.9)}
+#book-stele p{margin:0}
+#book-stele .vt{font-weight:700;letter-spacing:.16em}
+#book-stele .vs{font-weight:700;letter-spacing:.1em}
+@media (min-width:901px){
+  body.mode-book #book-stele{position:absolute;z-index:6;left:var(--qx,40%);top:var(--qy,50%);transform:translate(-50%,-50%) perspective(1100px) rotateX(12deg);transform-origin:50% 60%;
+    pointer-events:none;transition:opacity .5s;place-items:center}
+  #book-stele .verse{writing-mode:vertical-rl;height:calc(var(--bf,19px) * 13.8);font-size:var(--bf,19px);line-height:1.9;letter-spacing:.08em;pointer-events:auto;
+    display:flex;flex-direction:column;gap:0}
+  #book-stele .verse p+p{margin-block-start:.9em}
+  #book-stele .vt{font-size:1.06em;margin-block-end:.5em}
+  #book-stele .verse p.vs{margin-block-start:1.2em;text-align:end}
+  #book-stele.hide{opacity:0}
+}
+@media (max-width:900px){
+  body.mode-book #book-stele{order:4;margin:8px 12px;padding:14px 16px;place-items:start}
+  #book-stele .verse{font-size:17px;line-height:1.9}
+  #book-stele .verse p+p{margin-top:.5em}
+  #book-stele .vs{text-align:right}
+}
+@media (prefers-reduced-motion:no-preference){
+  #book-stele .verse{animation:verse 24s ease-in-out infinite}
+  #book-stele .verse+.verse{animation-delay:-12s}
+}
+@media (prefers-reduced-motion:reduce){
+  #book-stele .verse{animation:verse 24s steps(1) infinite}
+  #book-stele .verse+.verse{animation-delay:-12s}
+}
+@keyframes verse{0%{opacity:0;visibility:visible}6%,46%{opacity:1;visibility:visible}52%{opacity:0;visibility:visible}53%,100%{opacity:0;visibility:hidden}}

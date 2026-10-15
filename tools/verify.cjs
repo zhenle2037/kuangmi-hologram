@@ -75,6 +75,7 @@ const { chromium } = require('playwright');
   ok('行區列出跨類的持咒（同一珠位）', await p.evaluate(() => !![...document.querySelectorAll('#pane-content .chip.cross')].find(e => e.textContent.includes('持咒') && e.dataset.go === 'bead:' + KM.D.terms.find(t => t.name === '持咒').slot)));
   await home(p); await p.waitForTimeout(WAIT);
   await p.click('#mode-terms'); await p.waitForTimeout(2500);
+  { await p.mouse.move(5, 890); await p.click('#motion'); await p.waitForTimeout(1500); const r0 = await p.evaluate(() => KM3D.stats().rotY); await p.waitForTimeout(5000); const r1 = await p.evaluate(() => KM3D.stats().rotY); await p.click('#motion'); await p.waitForTimeout(500); ok('名相頁總覽：念珠會自轉（與其他頁相同）', Math.abs(r1 - r0) > 0.003, (r1 - r0).toFixed(4)); }
   ok('名相頁總覽：只標四顆隔珠，四區各有半透明罩體', await p.evaluate(() => [...document.querySelectorAll('.lab-terms')].filter(e => e.style.display !== 'none').length === 4 && KM3D.hullsVisible() === 4));
   ok('名相頁面板列出四區全部名相', (await pane(p)).includes('如來藏') && (await pane(p)).includes('密宗之中有解脫') && (await pane(p)).includes('三昧耶戒'));
   if (shots) await p.screenshot({ path: shots + '/d-terms.png' });
@@ -92,6 +93,8 @@ const { chromium } = require('playwright');
   ok('由名相的章節頁碼進入原書導讀同一節', (await p.evaluate(() => KM.getMode() + ' ' + KM.getSel().id)) === 'book 6-1');
 
   await home(p); await p.waitForTimeout(WAIT);
+  ok('原書導讀：右下引文移除，改為念珠中央的兩段題辭碑文（含《狂密與真密》標題）', await p.evaluate(() => !document.getElementById('main-quote').offsetParent && getComputedStyle(document.getElementById('book-stele')).display === 'grid' && [...document.querySelectorAll('#book-stele .verse')].length === 2 && [...document.querySelectorAll('#book-stele .vt')].every(e => e.textContent === '《狂密與真密》')));
+  ok('原書導讀：兩段題辭輪流顯示', await p.evaluate(() => [...document.querySelectorAll('#book-stele .verse')].every(e => getComputedStyle(e).animationName === 'verse')));
   ok('原書導讀：顯示17章名', await p.evaluate(() => [...document.querySelectorAll('.lab-book')].filter(e => e.style.display !== 'none').length) >= 14);
   if (shots) await p.screenshot({ path: shots + '/d3-book.png' });
   await p.evaluate(() => KM.go('chapter:c14')); await p.waitForTimeout(WAIT);

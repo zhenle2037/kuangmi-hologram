@@ -11,7 +11,7 @@
   var paused = false, reduce = false, lines = true, selected = null, focused = false, mode = "mala", labelSet = "parts";
   var hover = null, down = null, userDrag = false, spinV = 0, bobAmp = 1, tt = 0, rotTween = null, built = false;
   var labelDefs = [], labelEls = [], fanEls = [], leaderPaths = {};
-  var leaders, labelsBox, calloutEl, fanBox, mainLeader, crosshair, quoteEl;
+  var leaders, labelsBox, calloutEl, fanBox, mainLeader, crosshair, quoteEl, bookStele;
   var tmp = new T.Vector3(), tmp2 = new T.Vector3();
   var cands = [];
 
@@ -35,7 +35,7 @@
     host = document.getElementById("canvas-container"); stage = document.getElementById("stage");
     leaders = document.getElementById("leaders"); labelsBox = document.getElementById("labels");
     calloutEl = document.getElementById("callout"); fanBox = document.getElementById("fan");
-    crosshair = document.getElementById("crosshair"); quoteEl = document.getElementById("main-quote");
+    crosshair = document.getElementById("crosshair"); quoteEl = document.getElementById("main-quote"); bookStele = document.getElementById("book-stele");
     reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
     try {
       renderer = new T.WebGLRenderer({ antialias: true, alpha: true });
@@ -486,7 +486,7 @@
     if (rotTo != null) rotTween = G.to(malaGroup.rotation, { y: wrapNear(rotTo, malaGroup.rotation.y), duration: dur, ease: "power3.inOut" });
     G.to(controls.target, { x: tgtTo.x, y: tgtTo.y, z: tgtTo.z, duration: dur, ease: "power3.inOut" });
     G.to(camera.position, { x: camTo.x, y: camTo.y, z: camTo.z, duration: dur, ease: "power3.inOut", onComplete: function () { controls.enabled = true; } });
-    quoteEl.classList.toggle("hide", !!focused && !narrow);
+    quoteEl.classList.toggle("hide", !!focused && !narrow); bookStele.classList.toggle("hide", !!focused && !narrow);
     labelsBox.classList.toggle("hide", !!focused && !(labelSet === "terms" && sel && sel.k === "zone"));
     syncHulls();
     if (labelSet === "terms" && sel && sel.k === "zone") { var z3 = D.zones[sel.z], own = D.terms.filter(function (t) { return t.group === z3.group; }).length; calloutEl.innerHTML = "<b>" + KM.esc(z3.name) + "　區</b><small>數珠 " + z3.first + "–" + z3.last + " ・ " + z3.spacerName + " " + z3.spacerNo + " ・ 已配置 " + own + "／26 ・ 點名相進入該珠</small>"; calloutEl.classList.add("on", "zonehead"); } else calloutEl.classList.remove("zonehead");
@@ -556,9 +556,13 @@
     labelDefs.forEach(function (d) { if (d.set !== "zterm") { d.el.style.display = "none"; d.path.style.display = "none"; } });
   }
   function updateStele() { // 引文碑：置於整串念珠的中央
-    if (narrow || labelSet !== "parts" || focused) return;
+    if (narrow || (labelSet !== "parts" && labelSet !== "book") || focused) return;
     var c = toScreen(tmp.set(0, 0, 0)), f = toScreen(tmp2b.set(0, 0, R)), b = toScreen(tmp2b.set(0, 0, -R));
-    var top = Math.min(f.y, b.y), bot = Math.max(f.y, b.y), st = quoteEl.style;
+    var top = Math.min(f.y, b.y), bot = Math.max(f.y, b.y), st = document.documentElement.style; // 兩個碑文（引文、原書題辭）共用位置變數
+    if (labelSet === "book") { // 原書題辭：每行最多約 12 字，字級依念珠圈高度放大
+      var hb = bot - top; st.setProperty("--qx", c.x.toFixed(1) + "px"); st.setProperty("--qy", ((top + bot) / 2 + hb * 0.02).toFixed(1) + "px");
+      st.setProperty("--bf", Math.max(15, Math.min(23, hb * 0.62 / 13.8)).toFixed(2) + "px"); return;
+    }
     var hh = bot - top; st.setProperty("--qx", c.x.toFixed(1) + "px"); st.setProperty("--qy", ((top + bot) / 2 + hh * 0.02).toFixed(1) + "px"); // 碑文成橫向長方形（約念珠圈寬的 52%、高的 50%），與橫橢圓的念珠相配；依字數算字級，讓全文剛好填滿
     var ew = Math.abs(toScreen(tmp2b.set(R, 0, 0)).x - toScreen(tmp2b.set(-R, 0, 0)).x), qh = Math.max(140, hh * 0.5), qw = ew * 0.52;
     var nq = steleN || (steleN = (document.getElementById("quote-full").textContent || "").length || 160);
@@ -674,7 +678,7 @@
     requestAnimationFrame(loop);
     var raw = clock.getDelta(), dt = Math.min(0.05, raw);
     if (!paused && !reduce) { tt += dt; galaxyGroup.rotation.y += dt * 0.02; baseGroup.rotation.y -= dt * 0.05; }
-    var idle = !focused && !paused && !reduce && !hover && !userDrag && labelSet !== "terms"; // 名相頁不自轉，讓兩欄名相穩定好讀
+    var idle = !focused && !paused && !reduce && !hover && !userDrag && !(labelSet === "terms" && selected && selected.k === "zone"); // 名相頁總覽照常轉動；進入某區時停住，讓名相穩定好讀
     spinV += ((idle ? 0.07 : 0) - spinV) * Math.min(1, dt * 2.5); if (paused || reduce) spinV = 0;
     if (!(rotTween && rotTween.isActive())) malaGroup.rotation.y -= spinV * dt;
     bobAmp += ((focused ? 0 : 1) - bobAmp) * Math.min(1, dt * 3);
