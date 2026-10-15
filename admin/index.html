@@ -21,7 +21,7 @@
   (function () {
     var C = window.KM_CONFIG || {};
     var s = document.createElement("script");
-    s.src = C.supabaseJs || "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js";
+    s.src = C.supabaseJs || "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js";
     s.onload = function () { var a = document.createElement("script"); a.src = "admin.js"; document.body.appendChild(a); };
     s.onerror = function () { document.getElementById("app").textContent = "無法載入 Supabase 程式庫，請檢查網路。"; };
     if (window.supabase && window.supabase.createClient) s.onload(); else document.body.appendChild(s);

@@ -4,5 +4,5 @@
 window.KM_CONFIG = {
   supabaseUrl: "",
   supabaseAnonKey: "",
-  supabaseJs: "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"
+  supabaseJs: "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"
 };

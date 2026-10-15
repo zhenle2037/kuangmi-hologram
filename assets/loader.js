@@ -16,8 +16,10 @@
     document.body.appendChild(b);
   }
   function published() {
+    // 舊式 anon key 是 JWT，需同時放在 Authorization；新式 publishable key（sb_publishable_…）只放 apikey
+    var h = { apikey: C.supabaseAnonKey }; if (/^eyJ/.test(C.supabaseAnonKey)) h.Authorization = "Bearer " + C.supabaseAnonKey;
     var url = C.supabaseUrl.replace(/\/$/, "") + "/rest/v1/content_revisions?select=id,content,created_at&kind=eq.publish&order=id.desc&limit=1";
-    return withTimeout(fetch(url, { headers: { apikey: C.supabaseAnonKey, Authorization: "Bearer " + C.supabaseAnonKey } }), 6000)
+    return withTimeout(fetch(url, { headers: h }), 6000)
       .then(function (r) { if (!r.ok) throw new Error("http " + r.status); return r.json(); })
       .then(function (rows) {
         if (!rows || !rows.length || !rows[0].content || !rows[0].content.terms) throw new Error("no published content");
