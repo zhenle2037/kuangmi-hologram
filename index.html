@@ -25,8 +25,8 @@
       <div class="bv-veil" aria-hidden="true"></div>
       <button id="bv-back" class="bv-back" type="button">返回</button>
       <div id="bv-content" class="bv-scroll" tabindex="0"></div>
-      <button id="bv-prev" class="bv-side bv-right" type="button"><span class="bv-dir">上一顆 ›</span><span class="bv-name"></span></button>
-      <button id="bv-next" class="bv-side bv-left" type="button"><span class="bv-dir">‹ 下一顆</span><span class="bv-name"></span></button>
+      <button id="bv-prev" class="bv-side bv-right" type="button"><span class="bv-dir">上一顆 ›</span><span class="bv-name"></span><span class="bv-end" hidden></span></button>
+      <button id="bv-next" class="bv-side bv-left" type="button"><span class="bv-dir">‹ 下一顆</span><span class="bv-name"></span><span class="bv-end" hidden></span></button>
     </div>
     <p id="gl-fail" hidden>無法啟動 3D 念珠（瀏覽器不支援 WebGL）。請使用右側「完整目次」與內容面板閱讀，所有資料仍可使用。</p>
   </div>
@@ -77,9 +77,9 @@
 
   <aside class="panel" id="panel">
     <div class="navbar">
-      <button id="prev" type="button" aria-label="上一個已配置珠位">‹ 上一個</button>
+      <button id="next" type="button" aria-label="下一個已配置珠位">‹ 下一個</button>
       <button id="home" type="button">返回整串</button>
-      <button id="next" type="button" aria-label="下一個已配置珠位">下一個 ›</button>
+      <button id="prev" type="button" aria-label="上一個已配置珠位">上一個 ›</button>
     </div>
     <div class="tabs" role="tablist">
       <button role="tab" id="tab-content" aria-selected="true" aria-controls="pane-content">內容</button>

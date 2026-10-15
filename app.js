@@ -72,8 +72,14 @@
   function actForBead(bn) {
     var b = BEADS[bn];
     if (mode === "book") return b.ch ? "chapter:" + b.ch : null;
-    if (mode === "terms" && !b.spacer && !b.term) return null; // 名相頁：空白珠不可點
     if (b.spacer) return "spacer:" + b.z;
+    // 珠內閱讀時點相鄰的空白珠：依點的方向，直接跳到下一段（或上一段）有內容的珠
+    if (!b.term && sel && sel.k === "bead" && document.body.classList.contains("reading")) {
+      var fwd = ((bn - sel.n + 108) % 108) < 54;
+      var hi = ASSIGNED.filter(function (m) { return m > bn; }), lo = ASSIGNED.filter(function (m) { return m < bn; });
+      return "bead:" + (fwd ? (hi[0] || ASSIGNED[0]) : (lo.length ? lo[lo.length - 1] : ASSIGNED[ASSIGNED.length - 1]));
+    }
+    if (mode === "terms" && !b.term) return null; // 名相頁：空白珠不可點
     return b.term ? "bead:" + bn : "empty:" + bn;
   }
 
@@ -127,7 +133,7 @@
   }
   function syncNav() {
     var book = mode === "book";
-    $("#prev").textContent = book ? "‹ 上一章" : "‹ 上一珠"; $("#next").textContent = book ? "下一章 ›" : "下一珠 ›";
+    $("#prev").textContent = book ? "上一章 ›" : "上一珠 ›"; $("#next").textContent = book ? "‹ 下一章" : "‹ 下一珠"; // 順時針閱讀：下一個在左、上一個在右（與珠內閱讀一致）
     $("#prev").setAttribute("aria-label", book ? "上一章" : "上一個已配置珠位"); $("#next").setAttribute("aria-label", book ? "下一章" : "下一個已配置珠位");
     $("#home").textContent = "返回整串";
   }
@@ -297,7 +303,9 @@
     }
     var n = s.n, lo = ASSIGNED.filter(function (m) { return m < n; }), hi = ASSIGNED.filter(function (m) { return m > n; });
     var pn = lo.length ? lo[lo.length - 1] : ASSIGNED[ASSIGNED.length - 1], nn = hi.length ? hi[0] : ASSIGNED[0];
-    return { n: n, warm: !!BEADS[n].term, prev: { n: pn, name: termById[BEADS[pn].term].name }, next: { n: nn, name: termById[BEADS[nn].term].name }, unit: "顆" };
+    // 跨到另一區時，提示本區名相已結束
+    var zc = BEADS[n].z, endNote = function (m) { var zm = BEADS[m].z; return zm !== zc ? "本「" + D.zones[zc].name + "」區名相已結束，點擊跳至「" + D.zones[zm].name + "」區名相" : ""; };
+    return { n: n, warm: !!BEADS[n].term, prev: { n: pn, name: termById[BEADS[pn].term].name, end: endNote(pn) }, next: { n: nn, name: termById[BEADS[nn].term].name, end: endNote(nn) }, unit: "顆" };
   }
   function detailHTML(s) {
     var h = "";
@@ -347,6 +355,7 @@
     var content = $("#bv-content");
     $("#bv-prev .bv-dir").textContent = "上一" + nb.unit + " ›"; $("#bv-next .bv-dir").textContent = "‹ 下一" + nb.unit; // 順時針閱讀：下一顆在左、上一顆在右
     $("#bv-prev .bv-name").textContent = nb.prev.name; $("#bv-next .bv-name").textContent = nb.next.name;
+    [["#bv-prev", nb.prev], ["#bv-next", nb.next]].forEach(function (x) { var e = $(x[0] + " .bv-end"); e.textContent = x[1].end || ""; e.hidden = !x[1].end; });
     $("#bv-prev").setAttribute("aria-label", "上一" + nb.unit + "：" + nb.prev.name); $("#bv-next").setAttribute("aria-label", "下一" + nb.unit + "：" + nb.next.name);
     clearTimeout(bvTimer);
     v.hidden = false; v.classList.remove("on");

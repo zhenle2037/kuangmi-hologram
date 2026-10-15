@@ -371,3 +371,11 @@ body.has3d .partbar{display:none!important}
   #callout.zonehead b{font-size:22px}
   #callout.zonehead small{white-space:normal;max-width:min(86vw,340px);font-size:12px;line-height:1.5}
 }
+.bv-end{display:block;margin-top:4px;font-size:12px;line-height:1.5;color:#9b2226;letter-spacing:.04em;white-space:normal;max-width:9.5em;text-shadow:0 0 3px rgba(250,247,240,.95),0 0 8px rgba(250,247,240,.8)}
+.bv-end[hidden]{display:none}
+@media (max-width:900px){
+  .dock{order:0!important;padding:10px 12px 6px!important;gap:8px}
+  .top{order:1!important;padding:6px 16px 4px!important}
+  .top h1{font-size:22px;margin:0}
+  .bv-end{font-size:10.5px;max-width:100%}
+}
