@@ -7,7 +7,7 @@ seed = json.load(open(sys.argv[1], encoding="utf-8"))
 out_path = sys.argv[2]
 
 GROUPS = ["見", "修", "行", "果"]
-IMG = {"/visualization-art.png": "assets/contemplation.jpg"}  # 原站圖片路徑 → 本站檔案
+IMG = {"/visualization-art.png": ""}  # 原站的示意配圖不再使用
 
 def ref_obj(text, tgt):
     m = re.match(r"〔([^〕]+)〕(.*)$", text)
@@ -28,7 +28,7 @@ for t in seed["terms"]:
         "show": t["visibleGroups"], "slot": t["slot"],
         "refs": refs, "notes": t.get("notes") or [],
         "body": t.get("body", ""), "explanation": t.get("explanation", ""),
-        "image": IMG.get(t.get("image", ""), t.get("image", "")), "imageCaption": t.get("imageCaption", ""),
+        "image": IMG.get(t.get("image", ""), t.get("image", "")), "imageCaption": t.get("imageCaption", "") if IMG.get(t.get("image", ""), t.get("image", "")) else "",
     })
 
 chapters = []

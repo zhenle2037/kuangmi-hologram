@@ -330,9 +330,13 @@
     add("head", "part:head", "佛頭珠", function (out) { return guru.getWorldPosition(out); }, "out", 44, partHtml("head"));
     add("tassel", "part:tassel", "飾穗", function (out) { tassel.userData.hit.getWorldPosition(out); return out; }, "out", 44, partHtml("tassel"));
     add("pbead", "part:bead", "數珠", world(ringPt(34)), "out", 70, partHtml("bead"));
-    add("pspacer", "part:spacer", "隔珠", world(ringPt(54)), "out", 96, partHtml("spacer"));
-    add("string", "part:string", "串繩", world(ringPt(66)), "out", 60, partHtml("string"));
-    D.zones.forEach(function (zn, zi) { add("psp" + zi, "spacer:" + zi, zn.spacerName + "・" + zn.name, world(ringPt(zn.spacerNo)), "out", 30); labelDefs[labelDefs.length - 1].zone = zi; labelDefs[labelDefs.length - 1].spacer = true; }); // 見修行果四顆隔珠的標題
+    add("string", "part:string", "串繩", world(ringPt(66.5)), "out", 60, partHtml("string")); // 引線指向兩珠之間的串繩
+    // 四顆隔珠：標題與其他部件同格式；「隔珠・行」兼標隔珠的譬喻（風瑜伽）
+    D.zones.forEach(function (zn, zi) {
+      var t = "隔珠・" + zn.name, sub = zi === 2 ? KM.partText("spacer").text : "";
+      add("psp" + zi, zi === 2 ? "part:spacer" : "spacer:" + zi, t + (sub ? " " + sub : ""), world(ringPt(zn.spacerNo)), "out", zi === 0 ? 46 : 40, "<b>" + KM.esc(t) + "</b>" + (sub ? "<span>" + KM.esc(sub) + "</span>" : ""));
+      labelDefs[labelDefs.length - 1].zone = zi; labelDefs[labelDefs.length - 1].spacer = true;
+    });
     // 依四區查看名相
     set = "zones";
     add("head2", "part:head", "佛頭珠", function (out) { return guru.getWorldPosition(out); }, "out", 44);
@@ -555,9 +559,13 @@
     if (narrow || labelSet !== "parts" || focused) return;
     var c = toScreen(tmp.set(0, 0, 0)), f = toScreen(tmp2b.set(0, 0, R)), b = toScreen(tmp2b.set(0, 0, -R));
     var top = Math.min(f.y, b.y), bot = Math.max(f.y, b.y), st = quoteEl.style;
-    var hh = bot - top; st.setProperty("--qx", c.x.toFixed(1) + "px"); st.setProperty("--qy", ((top + bot) / 2 + hh * 0.02).toFixed(1) + "px"); st.setProperty("--qh", Math.max(240, hh * 0.84).toFixed(1) + "px"); // 碑立於念珠中央，不壓到佛頭 st.setProperty("--qw", Math.max(260, (Math.abs(toScreen(tmp2b.set(R, 0, 0)).x - toScreen(tmp2b.set(-R, 0, 0)).x)) * 0.62).toFixed(1) + "px");
+    var hh = bot - top; st.setProperty("--qx", c.x.toFixed(1) + "px"); st.setProperty("--qy", ((top + bot) / 2 + hh * 0.02).toFixed(1) + "px"); // 碑文成橫向長方形（約念珠圈寬的 52%、高的 50%），與橫橢圓的念珠相配；依字數算字級，讓全文剛好填滿
+    var ew = Math.abs(toScreen(tmp2b.set(R, 0, 0)).x - toScreen(tmp2b.set(-R, 0, 0)).x), qh = Math.max(140, hh * 0.5), qw = ew * 0.52;
+    var nq = steleN || (steleN = (document.getElementById("quote-full").textContent || "").length || 160);
+    var fs = Math.max(12, Math.min(19, Math.sqrt(qw * qh / (1.75 * 1.06 * nq * 1.12))));
+    st.setProperty("--qh", qh.toFixed(1) + "px"); st.setProperty("--qf", fs.toFixed(2) + "px"); // 碑立於念珠中央，不壓到佛頭 st.setProperty("--qw", Math.max(260, (Math.abs(toScreen(tmp2b.set(R, 0, 0)).x - toScreen(tmp2b.set(-R, 0, 0)).x)) * 0.62).toFixed(1) + "px");
   }
-  var tmp2b = new T.Vector3();
+  var tmp2b = new T.Vector3(), steleN = 0;
   function updateOverlays() {
     updateReader(); updateStele();
     var o = toScreen(tmp.set(0, 0, 0)), ctr = { x: o.x, y: o.y };
@@ -567,19 +575,23 @@
       labelDefs.forEach(function (d) {
         if (d.set !== labelSet) { d.el.style.display = "none"; d.path.style.display = "none"; return; }
         d.el.style.display = "";
-        d.anchor(tmp); var a = toScreen(tmp), dx = a.x - ctr.x, dy = a.y - ctr.y, m = Math.hypot(dx, dy) || 1; dx /= m; dy /= m;
+        d.anchor(tmp); var a = toScreen(tmp), pa = a; // pa：引線起點（飾穗的引線指向垂下的流蘇，標籤位置則以佛頭為準，免得被擠進念珠上）
+        if (d.id === "tassel") { guru.getWorldPosition(tmp); a = toScreen(tmp); }
+        var dx = a.x - ctr.x, dy = a.y - ctr.y, m = Math.hypot(dx, dy) || 1; dx /= m; dy /= m;
         if (d.mode === "in") { dx = -dx; dy = -dy; }
-        if (d.id === "head" || d.id === "head2" || d.id === "tassel") { dx = d.id === "tassel" ? 0.6 : -0.6; dy = -0.8; d.off = 78; } // 佛頭、飾穗標籤往上方兩側，避免蓋住佛頭兩旁的珠子 // 佛頭往左上、飾穗往右，避免蓋住珠子
+        // 佛頭珠、飾穗、隔珠・見同在一處：都朝念珠外側，分別偏左、偏右、正外，隨念珠轉動也不會轉進圈內
+        var pair = d.id === "head" || d.id === "head2" || d.id === "tassel";
+        if (pair) { var sg = d.id === "tassel" ? 1 : -1, ox = dx * 74 - sg * dy * 104, oy = dy * 74 + sg * dx * 104; d.off = Math.hypot(ox, oy); dx = ox / d.off; dy = oy / d.off; } // 往外 74px，再沿念珠切線左右各錯開 104px
         if (d.set === "book" && a.z > 1) { d.el.style.display = "none"; d.path.style.display = "none"; return; }
-        if (d.id === "sp0") { dx = 0.8; dy = 0.6; } // 隔珠一：標籤放右下，避開正上方的佛頭珠
-        var lx = a.x + dx * d.off, ly = a.y + dy * d.off, tx = dx > 0.35 ? "0" : dx < -0.35 ? "-100%" : "-50%";
+        var off = d.set === "parts" && !pair && Math.abs(dx) > 0.8 ? d.off * 0.45 : d.off; // 左右兩側空間較窄，標籤貼近念珠外緣
+        var lx = a.x + dx * off, ly = a.y + dy * off, tx = d.id === "psp0" ? "-50%" : dx > 0.35 ? "0" : dx < -0.35 ? "-100%" : "-50%"; // 隔珠・見夾在佛頭珠與飾穗之間，置中對齊
         // 標籤保持在可視範圍內（不被畫面邊緣或右側面板切掉）
         var w = d.w || (d.w = d.el.offsetWidth), left = tx === "0" ? lx : tx === "-100%" ? lx - w : lx - w / 2;
         var maxR = W - (narrow ? 0 : offX * 2) - 10, cl = Math.max(10, Math.min(left, maxR - w));
         if (cl !== left) { lx += cl - left; left = cl; }
         d.el.style.transform = "translate(" + left.toFixed(1) + "px," + ly.toFixed(1) + "px) translate(0,-50%)";
         var ex = dx > 0.35 ? lx : dx < -0.35 ? lx : lx, ey = ly + (dy > 0.5 ? -9 : dy < -0.5 ? 9 : 0);
-        d.path.setAttribute("d", "M" + a.x.toFixed(1) + " " + a.y.toFixed(1) + " L" + (dx > 0.35 ? lx - 2 : dx < -0.35 ? lx + 2 : lx).toFixed(1) + " " + ey.toFixed(1));
+        d.path.setAttribute("d", "M" + pa.x.toFixed(1) + " " + pa.y.toFixed(1) + " L" + (dx > 0.35 ? lx - 2 : dx < -0.35 ? lx + 2 : lx).toFixed(1) + " " + ey.toFixed(1));
         d.path.style.display = "";
       });
     } else labelDefs.forEach(function (d) { d.path.style.display = "none"; if (d.set === "zterm") d.el.style.display = "none"; });

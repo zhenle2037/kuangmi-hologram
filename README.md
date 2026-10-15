@@ -26,7 +26,7 @@
 - 狀態、面板、目次、兩種模式：`app.js`
 - 3D 念珠、拉近特寫、引線與文字入口：`scene.js`
 - 字型：思源宋體（Noto Serif TC，OFL）裁成本站用字，放在 `assets/fonts/`（新增文字後的重新裁切方法見 `tools/fonts/README.md`）
-- 樣式：`style.css`；圖片：`assets/`（禪林背景與觀想情境圖皆為 AI 生成示意，非原書圖版）
+- 樣式：`style.css`
 - 驗證：`NODE_PATH=$(npm root -g) node tools/verify.cjs file://$PWD/index.html <截圖資料夾>`
 
 ## 尚未做到

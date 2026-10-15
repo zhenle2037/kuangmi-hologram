@@ -8,7 +8,7 @@ const { chromium } = require('playwright');
   const out = []; const ok = (n, c, x = '') => out.push((c ? 'PASS' : 'FAIL') + ' ' + n + (x !== '' ? '  ' + x : ''));
   const WAIT = 7000;
   const errs = [];
-  const watch = (p, tag) => { p.on('requestfailed', r => { if (!/fonts\.g/.test(r.url())) errs.push(tag + 'request failed ' + r.url()); }); p.on('pageerror', e => errs.push(tag + String(e))); p.on('console', m => { if (m.type() === 'error' && !/ERR_TUNNEL|ERR_FILE_NOT_FOUND|fonts\.g/.test(m.text())) errs.push(tag + m.text()); }); };
+  const watch = (p, tag) => { p.on('requestfailed', r => { if (!/fonts\.g|supabase\.co/.test(r.url())) errs.push(tag + 'request failed ' + r.url()); }); p.on('pageerror', e => errs.push(tag + String(e))); p.on('console', m => { if (m.type() === 'error' && !/ERR_TUNNEL|ERR_FILE_NOT_FOUND|fonts\.g/.test(m.text())) errs.push(tag + m.text()); }); };
   // 點珠／章／節後，內容顯示在珠內閱讀畫面（#bv-content）；其餘在右側面板
   const pane = p => p.evaluate(() => { const v = document.getElementById('beadview'); return (v && !v.hidden ? document.getElementById('bv-content') : document.getElementById('pane-content')).textContent; });
   const home = p => p.evaluate(() => { const v = document.getElementById('beadview'); document.getElementById(v && !v.hidden ? 'bv-back' : 'home').click(); }); // 返回整串
@@ -50,7 +50,8 @@ const { chromium } = require('playwright');
   ok('引文逐字一致', d.quote === Q);
   ok('以數珠為喻頁：引文全文展開於念珠中央（碑文）', await p.isVisible('#quote-full') && (await p.textContent('#quote-full')) === Q && !(await p.isVisible('#quote-toggle')));
   ok('以數珠為喻頁：標出四顆隔珠標題', await p.evaluate(() => [...document.querySelectorAll('.lab-parts.lab-sp')].filter(e => e.style.display !== 'none').length) === 4);
-  ok('總覽顯示5個部件文字', await p.evaluate(() => [...document.querySelectorAll('.lab-parts.lab-part')].filter(e => e.style.display !== 'none').length) === 5);
+  ok('總覽顯示部件與四隔珠標題（佛頭、飾穗、數珠、串繩＋隔珠・見修行果，隔珠・行附風瑜伽）', await p.evaluate(() => { const v = [...document.querySelectorAll('.lab-parts.lab-part')].filter(e => e.style.display !== 'none').map(e => e.textContent); return v.length === 8 && v.includes('隔珠・行風瑜伽') && !v.some(t => /隔珠[一二三四]/.test(t)); }));
+  ok('背景不再使用禪林圖、說明區無 AI 示意配圖', await p.evaluate(() => !document.querySelector('.zen') && !document.querySelector('img[src*=contemplation]')));
   if (shots) await p.screenshot({ path: shots + '/d1-overview.png' });
 
   const c5 = await p.evaluate(() => KM3D.screenOf(5)); await p.mouse.click(c5.x, c5.y);
@@ -70,6 +71,7 @@ const { chromium } = require('playwright');
   await p.evaluate(() => KM.go('bead:20')); await p.waitForTimeout(300);
   ok('未配置珠位顯示待配置', (await pane(p)).includes('待配置珠位'));
   await p.evaluate(() => KM.go('zone:2')); await p.waitForTimeout(300);
+  ok('以數珠為喻點四區：直接進入見修行果名相頁的該區', await p.evaluate(() => document.body.classList.contains('mode-terms') && KM.getSel().k === 'zone' && KM.getSel().z === 2));
   ok('行區列出跨類的持咒（同一珠位）', await p.evaluate(() => !![...document.querySelectorAll('#pane-content .chip.cross')].find(e => e.textContent.includes('持咒') && e.dataset.go === 'bead:' + KM.D.terms.find(t => t.name === '持咒').slot)));
   await home(p); await p.waitForTimeout(WAIT);
   await p.click('#mode-terms'); await p.waitForTimeout(2500);

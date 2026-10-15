@@ -148,7 +148,7 @@
       return "<li>" + (r.sec && secById[r.sec] ? '<button class="ref" data-go="sec:' + r.sec + '">' + label + "</button>" : r.ch ? '<button class="ref" data-go="chapter:' + r.ch + '">' + label + "</button>" : label) + "</li>";
     }).join("") + "</ul>";
   }
-  function zoneHead(zn) { return '<p class="crumb zone-' + zn.id + '">以數珠為喻 ・ ' + esc(zn.name) + "區 ・ 數珠 " + zn.first + "–" + zn.last + "，隔珠 " + zn.spacerNo + "</p>"; }
+  function zoneHead(zn) { return '<p class="crumb zone-' + zn.id + '">' + (mode === "terms" ? "見修行果名相" : "以數珠為喻") + ' ・ ' + esc(zn.name) + "區 ・ 數珠 " + zn.first + "–" + zn.last + "，隔珠 " + zn.spacerNo + "</p>"; }
   function zoneBody(zn) {
     var ts = termsOfZone(zn.idx), own = ts.filter(function (t) { return t.group === zn.group; });
     var h = "<h3>分類說明 " + tag("nav") + '</h3><div class="box"><p>' + esc(zn.summary) + "</p><p>核心：" + esc(zn.core) + "</p></div>";
@@ -303,7 +303,7 @@
     var h = "";
     if (s.k === "bead" || s.k === "empty") {
       var b = BEADS[s.n], zn = D.zones[b.z];
-      h += '<p class="bv-crumb">以數珠為喻 ・ ' + esc(zn.name) + "區 ・ 第 " + b.pos + "／26 珠 ・ 環上 " + s.n + "／108</p>";
+      h += '<p class="bv-crumb">' + (mode === "terms" ? "見修行果名相" : "以數珠為喻") + ' ・ ' + esc(zn.name) + "區 ・ 第 " + b.pos + "／26 珠 ・ 環上 " + s.n + "／108</p>";
       if (!b.term) return h + '<h1 id="bv-title">待配置珠位</h1><p class="bv-note">此珠位尚未配置名相，內容待補。</p><p class="bv-links">' + chip("zone:" + zn.idx, "查看「" + esc(zn.name) + "」區已配置名相") + "</p>";
       var t = termById[b.term];
       h += '<h1 id="bv-title">' + esc(t.name) + "</h1>";
@@ -391,7 +391,7 @@
     var a = parseAct(str), v = a.v;
     if (a.k === "bead" || a.k === "empty") { var b = BEADS[+v]; if (b && !b.spacer) select({ k: b.term ? "bead" : "empty", n: +v }, opt); else if (b) select({ k: "spacer", z: b.z }, opt); }
     else if (a.k === "spacer") select({ k: "spacer", z: +v }, opt);
-    else if (a.k === "zone") select({ k: "zone", z: +v }, opt);
+    else if (a.k === "zone") { if (mode === "mala") setMode("terms", true); select({ k: "zone", z: +v }, opt); } // 四區一律在「見修行果名相」頁顯示（罩體、隔珠與名相）
     else if (a.k === "part") { if (D.parts[v]) select({ k: "part", id: v }, opt); }
     else if (a.k === "chapter") { if (chById[v]) select({ k: "chapter", id: v }, opt); }
     else if (a.k === "sec") { if (secById[v]) select({ k: "sec", id: v }, opt); }

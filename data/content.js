@@ -617,8 +617,8 @@ window.KM_DATA = {
    "notes": [],
    "body": "",
    "explanation": "",
-   "image": "assets/contemplation.jpg",
-   "imageCaption": "禪林光影情境示意配圖（AI生成）；僅供視覺導覽，非原書圖版或修法示範。"
+   "image": "",
+   "imageCaption": ""
   },
   {
    "id": "term-修-2",
