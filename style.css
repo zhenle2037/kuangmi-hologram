@@ -113,7 +113,7 @@ footer{text-align:center;color:var(--mut);font-size:.85rem;padding:20px 16px 40p
   body{font-size:16px}
   .hero{height:auto;min-height:0;overflow:visible;display:flex;flex-direction:column}
   .top{position:static;order:1;padding:14px 16px 8px;background:#f3ede3}
-  .stage{position:sticky;top:0;z-index:8;height:56svh;min-height:300px;order:2;background:#f3ede3}
+  .stage{position:sticky;top:0;z-index:8;height:48svh;min-height:300px;order:2;background:#f3ede3}
   #crosshair{left:50%;top:50%}
   .dock{position:static;order:3;align-items:stretch;padding:10px 12px;background:#f3ede3}
   .controls{justify-content:flex-start}
@@ -346,3 +346,28 @@ body.mode-book #book-stele{display:grid}
   #book-stele .verse+.verse{animation-delay:-12s}
 }
 @keyframes verse{0%{opacity:0;visibility:visible}6%,46%{opacity:1;visibility:visible}52%{opacity:0;visibility:visible}53%,100%{opacity:0;visibility:hidden}}
+
+/* ===== 手機版：與電腦版一致——標題標在念珠上、引文與題辭為無底色的直書碑文 ===== */
+body.has3d .partbar{display:none!important}
+#labels.narrow .lab-part span,#labels.narrow .lab-book .bt{display:none}
+#labels.narrow .lab{font-size:12px;padding:3px 4px;letter-spacing:.04em}
+#labels.narrow .lab-part b,#labels.narrow .lab-parts.lab-sp,#labels.narrow .lab-terms.lab-sp{font-size:13px;letter-spacing:.08em}
+@media (max-width:900px){
+  body.mode-mala #main-quote{display:flex;justify-content:center;background:none;border:0;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none;padding:6px 0 14px;margin:6px 12px}
+  body.mode-mala #main-quote #quote-full{writing-mode:vertical-rl;height:calc(var(--mqf) * 19.4);font-size:var(--mqf);line-height:1.75;letter-spacing:.04em;text-align:start;color:rgba(52,38,28,.88);max-width:100%;
+    text-shadow:1px 1px 0 rgba(255,255,255,.85),-1px -1px 0 rgba(90,60,35,.14)}
+  :root{--mqf:clamp(15px,4.3vw,19px)}
+  body.mode-book #book-stele{place-items:center;margin:6px 12px;padding:6px 0 14px}
+  #book-stele .verse{writing-mode:vertical-rl;height:calc(var(--mbf) * 13.8);font-size:var(--mbf);line-height:1.85;letter-spacing:.06em;display:flex;flex-direction:column}
+  :root{--mbf:clamp(14px,3.8vw,20px)}
+  #book-stele .verse p+p{margin:0;margin-block-start:.8em}
+  #book-stele .vt{font-size:1.06em;margin-block-end:.4em}
+  #book-stele .verse p.vs{margin-block-start:1.1em;text-align:end}
+}
+.lab-terms.lab-sp .sub{display:block;font-size:14px;letter-spacing:.14em;color:#5e5249;margin-top:2px}
+#labels.narrow .lab-terms.lab-sp .sub{font-size:11px;letter-spacing:.06em}
+@media (max-width:900px){
+  .modes button{padding:6px 4px;letter-spacing:.04em;font-size:14.5px;white-space:nowrap}
+  #callout.zonehead b{font-size:22px}
+  #callout.zonehead small{white-space:normal;max-width:min(86vw,340px);font-size:12px;line-height:1.5}
+}

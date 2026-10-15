@@ -346,14 +346,16 @@
     });
     // 見修行果名相：76 個名相＋4 顆隔珠，全部標出（左右兩欄排列）
     set = "terms";
-    D.zones.forEach(function (zn, zi) { add("tsp" + zi, "zone:" + zi, zn.spacerName + "・" + zn.spacerTitle, world(ringPt(zn.spacerNo)), "out", 40); labelDefs[labelDefs.length - 1].zone = zi; labelDefs[labelDefs.length - 1].spacer = true; });
+    D.zones.forEach(function (zn, zi) { // 與「以數珠為喻」頁一致：隔珠・見／修／行／果；括號內的說明（如風瑜伽）改為小字副標
+      var m = /^[^（(]*[（(]([^）)]*)[）)]/.exec(zn.spacerTitle || "");
+      add("tsp" + zi, "zone:" + zi, "隔珠・" + zn.name, world(ringPt(zn.spacerNo)), "out", 40); var dd = labelDefs[labelDefs.length - 1]; dd.zone = zi; dd.spacer = true; dd.sub = m ? m[1] : ""; });
     set = "zterm"; // 進入某區後才顯示的該區名相
     D.terms.forEach(function (t) { add("t" + t.slot, "bead:" + t.slot, t.name, world(ringPt(t.slot)), "row", 0); labelDefs[labelDefs.length - 1].zone = KM.BEADS[t.slot].z; labelDefs[labelDefs.length - 1].n = t.slot; });
     // 原書導讀：17 章各一顆
     set = "book";
     D.chapters.forEach(function (c) { add("ch" + c.no, "chapter:" + c.id, KM.chLabel(c) + " " + KM.shortTitle(c.title), world(ringPt(KM.CH_BEAD[c.id])), "out", 26); });
     labelDefs.forEach(function (d) {
-      var b = document.createElement("button"); b.type = "button"; b.className = "lab lab-" + d.set + (d.html ? " lab-part" : "") + (d.zone != null ? " lab-z" + d.zone : "") + (d.spacer ? " lab-sp" : ""); if (d.html) b.innerHTML = d.html; else b.textContent = d.text; b.setAttribute("data-act", d.act); b.setAttribute("aria-label", d.text);
+      var b = document.createElement("button"); b.type = "button"; b.className = "lab lab-" + d.set + (d.html ? " lab-part" : "") + (d.zone != null ? " lab-z" + d.zone : "") + (d.spacer ? " lab-sp" : ""); if (d.html) b.innerHTML = d.html; else if (d.sub) b.innerHTML = KM.esc(d.text) + '<small class="sub">' + KM.esc(d.sub) + "</small>"; else if (d.set === "book") { var sp1 = d.text.indexOf(" "); b.innerHTML = '<span class="bn">' + KM.esc(d.text.slice(0, sp1)) + '</span><span class="bt">' + KM.esc(d.text.slice(sp1)) + "</span>"; } else b.textContent = d.text; b.setAttribute("data-act", d.act); b.setAttribute("aria-label", d.text);
       b.addEventListener("click", function () { KM.go(d.act); });
       labelsBox.appendChild(b); d.el = b;
       var p = document.createElementNS("http://www.w3.org/2000/svg", "path"); leaders.appendChild(p); d.path = p;
@@ -363,12 +365,12 @@
 
   /* ---------- 版面 ---------- */
   function overviewPos() {
-    var f = Math.max(1, 1.5 / aEff()) * 1;
-    return new T.Vector3(0, 30 * f, 60 * f);
+    var f = Math.max(1, 1.5 / aEff()) * (narrow ? 1.2 : 1); // 手機：念珠縮小一些，左右留出標題的位置
+    return narrow && W < H * 1.1 ? new T.Vector3(0, 50 * f, 44 * f) : new T.Vector3(0, 30 * f, 60 * f); // 手機畫面較高：鏡頭抬高，念珠橢圓較圓、填滿上下空間
   }
   function resize() {
     if (!renderer) return;
-    W = host.clientWidth || 800; H = host.clientHeight || 600; narrow = W < 760;
+    W = host.clientWidth || 800; H = host.clientHeight || 600; narrow = window.matchMedia ? window.matchMedia("(max-width:900px)").matches : W < 760; // 與 CSS 的手機版斷點一致
     var panel = document.getElementById("panel");
     var pw = (!narrow && panel) ? panel.offsetWidth + 32 : 0;
     offX = pw / 2; offY = narrow ? 0 : 55;
@@ -376,7 +378,7 @@
     camera.aspect = W / H;
     camera.setViewOffset(W, H, offX, offY, W, H);
     camera.updateProjectionMatrix();
-    labelsBox.style.display = narrow ? "none" : "";
+    labelsBox.classList.toggle("narrow", narrow); labelDefs.forEach(function (d) { d.w = 0; }); // 手機也顯示標題（只顯示標題字，不顯示說明）
     if (built && !focused) { camera.position.copy(overviewPos()); }
   }
 
@@ -575,7 +577,7 @@
     var o = toScreen(tmp.set(0, 0, 0)), ctr = { x: o.x, y: o.y };
     var zoneView = labelSet === "terms" && selected && selected.k === "zone";
     if (zoneView) layoutZone(selected.z);
-    else if (!narrow && !focused) {
+    else if (!focused) {
       labelDefs.forEach(function (d) {
         if (d.set !== labelSet) { d.el.style.display = "none"; d.path.style.display = "none"; return; }
         d.el.style.display = "";
@@ -585,9 +587,9 @@
         if (d.mode === "in") { dx = -dx; dy = -dy; }
         // 佛頭珠、飾穗、隔珠・見同在一處：都朝念珠外側，分別偏左、偏右、正外，隨念珠轉動也不會轉進圈內
         var pair = d.id === "head" || d.id === "head2" || d.id === "tassel";
-        if (pair) { var sg = d.id === "tassel" ? 1 : -1, ox = dx * 74 - sg * dy * 104, oy = dy * 74 + sg * dx * 104; d.off = Math.hypot(ox, oy); dx = ox / d.off; dy = oy / d.off; } // 往外 74px，再沿念珠切線左右各錯開 104px
+        if (pair) { var sg = d.id === "tassel" ? 1 : -1, ko = narrow ? 0.45 : 1, ox = (dx * 74 - sg * dy * 104) * ko, oy = (dy * 74 + sg * dx * 104) * ko; d.off = Math.hypot(ox, oy); dx = ox / d.off; dy = oy / d.off; } // 往外 74px，再沿念珠切線左右各錯開 104px
         if (d.set === "book" && a.z > 1) { d.el.style.display = "none"; d.path.style.display = "none"; return; }
-        var off = d.set === "parts" && !pair && Math.abs(dx) > 0.8 ? d.off * 0.45 : d.off; // 左右兩側空間較窄，標籤貼近念珠外緣
+        var off = (d.set === "parts" && !pair && Math.abs(dx) > 0.8 ? d.off * 0.45 : d.off) * (narrow && !pair ? 0.5 : 1); // 左右兩側空間較窄，標籤貼近念珠外緣
         var lx = a.x + dx * off, ly = a.y + dy * off, tx = d.id === "psp0" ? "-50%" : dx > 0.35 ? "0" : dx < -0.35 ? "-100%" : "-50%"; // 隔珠・見夾在佛頭珠與飾穗之間，置中對齊
         // 標籤保持在可視範圍內（不被畫面邊緣或右側面板切掉）
         var w = d.w || (d.w = d.el.offsetWidth), left = tx === "0" ? lx : tx === "-100%" ? lx - w : lx - w / 2;

@@ -75,7 +75,7 @@ const { chromium } = require('playwright');
   ok('行區列出跨類的持咒（同一珠位）', await p.evaluate(() => !![...document.querySelectorAll('#pane-content .chip.cross')].find(e => e.textContent.includes('持咒') && e.dataset.go === 'bead:' + KM.D.terms.find(t => t.name === '持咒').slot)));
   await home(p); await p.waitForTimeout(WAIT);
   await p.click('#mode-terms'); await p.waitForTimeout(2500);
-  { await p.mouse.move(5, 890); await p.click('#motion'); await p.waitForTimeout(1500); const r0 = await p.evaluate(() => KM3D.stats().rotY); await p.waitForTimeout(5000); const r1 = await p.evaluate(() => KM3D.stats().rotY); await p.click('#motion'); await p.waitForTimeout(500); ok('名相頁總覽：念珠會自轉（與其他頁相同）', Math.abs(r1 - r0) > 0.003, (r1 - r0).toFixed(4)); }
+  { await p.mouse.move(5, 890); await p.click('#motion'); await p.waitForTimeout(1500); const r0 = await p.evaluate(() => KM3D.stats().rotY); await p.waitForTimeout(5000); const r1 = await p.evaluate(() => KM3D.stats().rotY); await p.click('#motion'); await p.waitForTimeout(500); ok('名相頁總覽：念珠會自轉（與其他頁相同）', Math.abs(r1 - r0) > 0.001, (r1 - r0).toFixed(4)); }
   ok('名相頁總覽：只標四顆隔珠，四區各有半透明罩體', await p.evaluate(() => [...document.querySelectorAll('.lab-terms')].filter(e => e.style.display !== 'none').length === 4 && KM3D.hullsVisible() === 4));
   ok('名相頁面板列出四區全部名相', (await pane(p)).includes('如來藏') && (await pane(p)).includes('密宗之中有解脫') && (await pane(p)).includes('三昧耶戒'));
   if (shots) await p.screenshot({ path: shots + '/d-terms.png' });
@@ -121,6 +121,13 @@ const { chromium } = require('playwright');
   const m = await b.newPage({ viewport: { width: 390, height: 844 }, hasTouch: true }); watch(m, 'mobile: ');
   await m.goto(url); await m.waitForFunction(() => window.__kmReady, null, { timeout: 90000 });
   ok('手機無橫向捲動', (await m.evaluate(() => document.documentElement.scrollWidth)) <= 390);
+  await m.waitForTimeout(2500);
+  ok('手機：念珠上標出部件與四隔珠標題（同電腦版）', await m.evaluate(() => { const v = [...document.querySelectorAll('.lab-parts')].filter(e => e.style.display !== 'none' && e.offsetWidth > 0); return v.length === 8 && v.every(e => { const r = e.getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth; }); }));
+  ok('手機：導師引文為無底色的直書碑文', await m.evaluate(() => getComputedStyle(document.getElementById('quote-full')).writingMode === 'vertical-rl' && getComputedStyle(document.getElementById('main-quote')).backgroundColor === 'rgba(0, 0, 0, 0)'));
+  await m.evaluate(() => document.getElementById('mode-book').click()); await m.waitForTimeout(1500);
+  ok('手機：原書導讀顯示章標與題辭碑文，不顯示舊引文', await m.evaluate(() => [...document.querySelectorAll('.lab-book')].filter(e => e.style.display !== 'none').length >= 12 && getComputedStyle(document.getElementById('book-stele')).display === 'grid' && !document.getElementById('main-quote').offsetParent));
+  ok('手機：原書導讀頁無橫向捲動', (await m.evaluate(() => document.documentElement.scrollWidth)) <= 390);
+  await m.evaluate(() => document.getElementById('mode-mala').click()); await m.waitForTimeout(800);
   await m.evaluate(() => KM.go('chapter:c14')); await m.waitForTimeout(500);
   ok('手機每批5節', (await pane(m)).includes('第 1–5 節／共 40 節'));
   if (shots) await m.screenshot({ path: shots + '/m1.png' });

@@ -438,8 +438,9 @@
     initQuote();
     buildToc();
     $("#partbar").innerHTML = PART_KEYS.map(function (kk) { return '<button type="button" data-go="part:' + kk + '">' + esc(D.parts[kk].title) + "</button>"; }).join("") +
-      D.zones.map(function (zn) { return '<button type="button" class="mala-only" data-go="spacer:' + zn.idx + '">' + zn.spacerName + "・" + esc(zn.spacerTitle) + "</button>"; }).join("");
+      D.zones.map(function (zn) { return '<button type="button" class="mala-only" data-go="spacer:' + zn.idx + '">隔珠・' + esc(zn.name) + "</button>"; }).join("");
     try { has3D = !!(window.THREE && window.KM3D && window.KM3D.init(KM)); } catch (e) { console.error(e); has3D = false; }
+    document.body.classList.toggle("has3d", has3D); // 有 3D 時，部件與隔珠直接標在念珠上（手機也是），不再另列按鈕
     if (!has3D) {
       $("#gl-fail").hidden = false;
       var l = $("#loading"); if (l) l.style.display = "none";
