@@ -229,6 +229,9 @@
           '<p class="pos">環上編號 ' + z2.spacerNo + "／108 ・ 引領其後 26 顆普通數珠（" + z2.first + "–" + z2.last + "）</p>";
         h += "<h3>原文的隔珠譬喻 " + tag("quote") + '</h3><div class="box">以風瑜伽為隔珠</div>';
         h += '<div class="notice">引文原本只說「以風瑜伽為隔珠」。將四顆隔珠分別設為「見、修、行、果」，是本網站的導覽安排，並非引文本身的說法。' + (sel.z === 1 ? "（第二隔珠標示「修（風瑜伽）」，與原文的風瑜伽相呼應。）" : "") + "</div>";
+        if (z2.spacerBody) h += "<h3>原書正文 " + tag("book") + '</h3><div class="prose">' + esc(z2.spacerBody) + "</div>";
+        if (z2.spacerExplanation) h += "<h3>整理說明 " + tag("nav") + '</h3><div class="prose">' + esc(z2.spacerExplanation) + "</div>";
+        if (z2.spacerImage && /^(https:\/\/|assets\/)/.test(z2.spacerImage)) h += '<figure class="fig"><img src="' + esc(z2.spacerImage) + '" alt="' + esc(z2.spacerImageCaption || "") + '" loading="lazy"><figcaption>' + esc(z2.spacerImageCaption || "") + "</figcaption></figure>";
       } else h = zoneHead(z2) + "<h2>" + esc(z2.name) + "　區</h2>";
       h += zoneBody(z2);
     } else if (sel.k === "part") {

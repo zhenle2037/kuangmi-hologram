@@ -36,7 +36,10 @@ window.supabase = { createClient: function () {
       signInWithOAuth: function (o) { window.__oauth = o; return Promise.resolve({ data: {}, error: null }); },
       signInWithOtp: function (o) { window.__otp = o; return Promise.resolve({ data: {}, error: null }); }
     },
-    rpc: function (name, args) { return window.__pgRpc(user() || '', name, args || {}); }
+    rpc: function (name, args) { return window.__pgRpc(user() || '', name, args || {}); },
+    storage: { from: function (bucket) { return {
+      upload: function (path, file, opts) { (window.__uploads = window.__uploads || []).push({ bucket: bucket, path: path, type: opts && opts.contentType, size: file.size }); return Promise.resolve({ data: { path: path }, error: null }); },
+      getPublicUrl: function (path) { return { data: { publicUrl: "https://fake-project.supabase.co/storage/v1/object/public/" + bucket + "/" + path } }; } }; } }
   };
 } };`;
 
@@ -243,6 +246,34 @@ window.supabase = { createClient: function () {
   await page.locator('h3:text-is("導師引文（必須逐字保留）") ~ .actions button').click(); await page.waitForTimeout(400);
   const qv = (await rpc('owner@example.com', 'preview_content', {})).data.quote;
   ok('修改引文時要求再次確認，取消則不儲存', /引文與原始全文不同/.test(dialogs[dialogs.length - 1]) && qv.includes('平實導師'));
+
+  /* 11b. 隔珠編輯、新增章與目、上傳圖片 */
+  await tab('108 珠位');
+  await page.click('.bead.spacer:has-text("第 27 顆")'); await page.waitForTimeout(400);
+  ok('108 珠位：點隔珠開啟隔珠編輯', await page.isVisible('#spacer-editor'));
+  await page.fill('#spacer-editor label:text-is("原書正文") + textarea', '隔珠二的正文（測試）');
+  await page.setInputFiles('#spacer-editor input[type=file]', { name: 'pic.png', mimeType: 'image/png', buffer: Buffer.from('89504e470d0a1a0a', 'hex') }); await page.waitForTimeout(500);
+  const upUrl = await page.inputValue('#spacer-editor .row input:not([type=file])');
+  ok('上傳圖片：存到 images 空間並填入公開網址', /^https:\/\/fake-project\.supabase\.co\/storage\/v1\/object\/public\/images\/spacers\/.+\.png$/.test(upUrl) && (await page.evaluate(() => window.__uploads.length)) === 1, upUrl);
+  await page.click('button:has-text("儲存隔珠（草稿）")'); await page.waitForTimeout(600);
+  const zx = (await rpc('owner@example.com', 'preview_content', {})).data.zones.find(z => z.id === 'xiu');
+  ok('隔珠內容與圖片存入草稿', zx.spacerBody === '隔珠二的正文（測試）' && zx.spacerImage === upUrl);
+  await tab('名相'); await pickTerm('持咒');
+  ok('名相編輯有「上傳圖片」按鈕', await page.isVisible('#term-editor button:has-text("上傳圖片")'));
+  await tab('章節');
+  answers = ['測試第十八章', '4'];
+  await page.click('button:has-text("＋ 新增章")'); await page.waitForTimeout(800);
+  ok('章節：新增章（第 18 章）', /已新增第 18 章/.test(await noticeTxt()) && (await rpc('owner@example.com', 'admin_load', {})).data.chapters.length === 18, await noticeTxt());
+  answers = ['新節一'];
+  await page.click('button:has-text("＋ 新增節")'); await page.waitForTimeout(800);
+  answers = ['新目一'];
+  await page.click('button:has-text("＋目")'); await page.waitForTimeout(800);
+  const c18 = (await rpc('owner@example.com', 'preview_content', {})).data.chapters.find(c => c.no === 18);
+  ok('章節：新章下新增節與目', c18 && c18.title === '測試第十八章' && c18.sections[0].title === '新節一' && c18.sections[0].items && c18.sections[0].items[0].title === '新目一', JSON.stringify(c18 && c18.sections));
+  ok('章節：章也有上傳圖片按鈕，Owner 有刪除本章', await page.isVisible('button:has-text("上傳圖片")') && await page.isVisible('button:has-text("刪除本章")'));
+  answers = ['18'];
+  await page.click('button:has-text("刪除本章")'); await page.waitForTimeout(800);
+  ok('章節：Owner 刪除新章', (await rpc('owner@example.com', 'admin_load', {})).data.chapters.length === 17);
 
   /* 12. 撤銷權限 */
   await tab('成員權限'); answers = [true];

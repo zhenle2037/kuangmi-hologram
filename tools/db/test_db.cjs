@@ -164,6 +164,29 @@ alter default privileges in schema public grant all on sequences to anon, authen
   ok('還原並發布後公開內容與原始資料一致', pub4.terms.length === 76 && pub4.terms.every(t => srcT[t.id] === norm(t)));
   ok('還原後仍是 108 顆、4 隔珠', +(await db.query('select count(*) n from bead_positions')).rows[0].n === 108);
 
+  // ---- 8b. 隔珠內容、新增章／目 ----
+  const cats = (await rpc('editor', 'admin_load')).r.categories, xiu = cats.find(c => c.id === 'xiu');
+  const sp = await rpc('editor', 'save_spacer', [{ id: 'xiu', spacer_name: xiu.spacer_name, spacer_title: xiu.spacer_title, spacer_body: '隔珠正文測試', spacer_explanation: '說明', spacer_image: 'https://example.com/a.png', spacer_image_caption: '圖' }, xiu.version]);
+  ok('Editor 可編輯隔珠內容', !sp.error, sp.error || '');
+  const pz = (await rpc('editor', 'preview_content')).r.zones.find(z => z.id === 'xiu');
+  ok('隔珠內容進入網站內容（預覽）', pz.spacerBody === '隔珠正文測試' && pz.spacerImage === 'https://example.com/a.png');
+  ok('隔珠：版本衝突被擋下', !!(await rpc('editor', 'save_spacer', [{ id: 'xiu', spacer_name: 'x', spacer_title: 'y' }, xiu.version])).error);
+  ok('隔珠：圖片網址必須是 https', !!(await rpc('editor', 'save_spacer', [{ id: 'xiu', spacer_name: 'x', spacer_title: 'y', spacer_image: 'javascript:alert(1)' }, xiu.version + 1])).error);
+  ok('訪客不能編輯隔珠', !!(await rpc('anon', 'save_spacer', [{ id: 'xiu' }, 1])).error);
+  const nc = await rpc('editor', 'create_chapter', [{ title: '測試新章', vols: [4] }]);
+  ok('Editor 可新增章（章號接在最後）', !nc.error && nc.r.no === 18, nc.error || JSON.stringify(nc.r));
+  const ns = await rpc('editor', 'save_section', [{ id: 'c18-s1', chapter_id: nc.r.id, no: '1', title: '新節', page: '1', vol: '4' }, 0]);
+  const ni = await rpc('editor', 'save_section', [{ id: 'c18-s1-i1', chapter_id: nc.r.id, parent_id: 'c18-s1', no: '1', title: '新目', page: '2', vol: '4' }, 0]);
+  const pch = (await rpc('editor', 'preview_content')).r.chapters.find(c => c.id === nc.r.id);
+  ok('新章可新增節與目', !ns.error && !ni.error && pch.sections[0].title === '新節' && pch.sections[0].items[0].title === '新目', (ns.error || ni.error || ''));
+  ok('Editor 不能刪除章', !!(await rpc('editor', 'delete_chapter', [nc.r.id])).error);
+  const dc = await rpc('owner', 'delete_chapter', [nc.r.id]);
+  ok('Owner 可刪除章（連同節目）', !dc.error && !(await rpc('owner', 'preview_content')).r.chapters.find(c => c.id === nc.r.id) && +(await db.query(`select count(*) n from sections where chapter_id = 'c18'`)).rows[0].n === 0);
+  await rpc('editor', 'create_chapter', [{ title: '還原前新增的章' }]);
+  const rv2 = (await rpc('owner', 'list_revisions', [50])).r; await rpc('owner', 'restore_revision', [rv2[rv2.length - 1].id]);
+  const ar = (await rpc('owner', 'preview_content')).r;
+  ok('還原到舊版本時，之後新增的章會移除、隔珠內容回到舊版', ar.chapters.length === 17 && !ar.zones.find(z => z.id === 'xiu').spacerBody);
+
   // ---- 9. 紀錄 ----
   const aud = (await rpc('owner', 'list_audit', [1000, 'terms'])).r.concat((await rpc('owner', 'list_audit', [1000, 'content_revisions'])).r);
   ok('操作紀錄記下修改者與時間', aud.some(a => a.table_name === 'terms' && a.user_email === 'editor@example.com' && a.action === 'update' && a.at));

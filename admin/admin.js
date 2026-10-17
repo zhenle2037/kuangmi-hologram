@@ -8,7 +8,7 @@
   var ORIGINAL_QUOTE = "以數珠為喻：西藏密宗乃是以種種虛構之觀想法、持外道咒、天瑜伽、遷識⋯等外道法為數珠，以風瑜伽為隔珠，以佛教教相及僧寶表相為佛頭珠；以自己所定義之般若中觀名相及果位修證名相，作為佛頭珠所懸之飾穗，最後以淫樂之樂空雙運欲界外道雙身法為串繩，貫串密宗之一切成佛理論與行門。如是串成之數珠，即是西藏密教之真實宗義。－－平實導師－－";
   var KINDS = ["直接", "關聯", "僅章題"];
   var app = document.getElementById("app"), who = document.getElementById("who"), noticeEl = document.getElementById("notice");
-  var sb = null, S = null, tab = "terms", dirty = false, selTerm = null, selChapter = null;
+  var sb = null, S = null, tab = "terms", dirty = false, selTerm = null, selChapter = null, selSpacer = null;
 
   /* ---------- 小工具 ---------- */
   function el(tag, attrs) {
@@ -35,6 +35,28 @@
   }
   function isConflict(e) { return /version_conflict/.test((e && e.message) || "") || (e && e.code === "40001"); }
   function rpc(name, args) { return sb.rpc(name, args || {}).then(function (r) { if (r.error) throw r.error; return r.data; }); }
+  // 圖片上傳（Supabase Storage 的 images 空間）：上傳後把公開網址填入對應欄位
+  function uploadButton(input, folder) {
+    var file = el("input", { type: "file", accept: "image/jpeg,image/png,image/webp,image/gif", style: "display:none" });
+    var btn = el("button", { type: "button", cls: "fix", text: "上傳圖片…", on: { click: function () { file.click(); } } });
+    file.addEventListener("change", function () {
+      var f = file.files && file.files[0]; if (!f) return;
+      if (f.size > 5 * 1024 * 1024) { notice("圖片超過 5MB，請先縮小後再上傳。", "err"); return; }
+      var ext = (f.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg";
+      var path = folder + "/" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 7) + "." + ext;
+      btn.disabled = true; btn.textContent = "上傳中…";
+      sb.storage.from("images").upload(path, f, { contentType: f.type, upsert: false }).then(function (r) {
+        btn.disabled = false; btn.textContent = "上傳圖片…"; file.value = "";
+        if (r.error) { notice("上傳失敗：" + (r.error.message || r.error) + (/bucket|not found/i.test(r.error.message || "") ? "（請先在 Supabase 執行第二次資料庫更新）" : ""), "err"); return; }
+        input.value = sb.storage.from("images").getPublicUrl(path).data.publicUrl;
+        input.dispatchEvent(new Event("input")); notice("已上傳，記得按儲存。", "ok");
+      });
+    });
+    return el("span", { cls: "fix upl" }, btn, file);
+  }
+  function imgRow(img, cap, folder) { // 圖片網址＋上傳按鈕＋說明
+    return el("div", { cls: "grid2" }, el("div", {}, el("label", { text: "圖片網址" }), el("div", { cls: "row" }, img, uploadButton(img, folder))), el("div", {}, el("label", { text: "圖片說明／來源" }), cap));
+  }
   function isOwner() { return S && S.me && S.me.role === "owner"; }
   function catName(id) { var c = S.categories.find(function (x) { return x.id === id; }); return c ? c.name : id; }
   function setDirty(v) { dirty = v; }
@@ -103,7 +125,7 @@
     var nav = el("div", { cls: "tabs", role: "tablist" });
     TABS.forEach(function (t) {
       if (t[0] === "members" && !isOwner()) return;
-      nav.appendChild(el("button", { role: "tab", "aria-selected": tab === t[0] ? "true" : "false", text: t[1], on: { click: function () { if (tab !== t[0] && confirmLeave()) { dirty = false; tab = t[0]; render(); } } } }));
+      nav.appendChild(el("button", { role: "tab", "aria-selected": tab === t[0] ? "true" : "false", text: t[1], on: { click: function () { if (tab !== t[0] && confirmLeave()) { dirty = false; tab = t[0]; selSpacer = null; render(); } } } }));
     });
     app.appendChild(nav);
     var body = el("div"); app.appendChild(body);
@@ -230,7 +252,7 @@
       el("label", { text: "子名相・校訂註（每行一條）" }), notes,
       el("label", { text: "原書正文" }), body,
       el("label", { text: "整理說明（與原文分開）" }), expl,
-      el("div", { cls: "grid2" }, el("div", {}, el("label", { text: "圖片網址" }), img), el("div", {}, el("label", { text: "圖片說明／來源" }), cap)),
+      imgRow(img, cap, "terms"),
       el("label", { text: "章節對應（〔直接〕〔關聯〕〔僅章題〕）" }), refBox,
       conflictBox,
       el("div", { cls: "actions" },
@@ -248,6 +270,7 @@
 
   /* ---------- 108 珠位 ---------- */
   function viewBeads(body) {
+    if (selSpacer) return viewSpacer(body, S.categories.find(function (x) { return x.id === selSpacer; }));
     body.appendChild(el("p", { cls: "muted small", text: "108 顆固定，不可增刪。每區隔珠在前、名相珠在後。點已配置的珠可編輯名相；點空珠可把同區的名相移過來。" }));
     var order = [108].concat(Array.from({ length: 107 }, function (_, i) { return i + 1; }));
     S.categories.forEach(function (c) {
@@ -255,6 +278,7 @@
       order.filter(function (n) { var b = S.beads[n - 1]; return b.category_id === c.id; }).forEach(function (n) {
         var b = S.beads[n - 1], t = b.term_id && S.terms.find(function (x) { return x.id === b.term_id; });
         var cell = el("button", { cls: "bead" + (b.kind === "spacer" ? " spacer" : t ? "" : " empty") }, el("small", { text: "第 " + n + " 顆" + (b.kind === "spacer" ? "・隔珠" : "") }), el("span", { text: b.kind === "spacer" ? c.spacer_name + "・" + c.spacer_title : t ? t.name : "（空）" }));
+        if (b.kind === "spacer") cell.addEventListener("click", function () { selSpacer = c.id; render(); });
         if (b.kind !== "spacer") cell.addEventListener("click", function () {
           if (t) { selTerm = t.id; tab = "terms"; render(); return; }
           var cands = S.terms.filter(function (x) { return x.primary_category === c.id && !x.archived; });
@@ -270,6 +294,26 @@
     });
   }
 
+  function viewSpacer(body, c) { // 隔珠編輯：名稱、標題、原書正文、整理說明、圖片
+    var back = el("button", { text: "‹ 回到 108 珠位", on: { click: function () { if (confirmLeave()) { dirty = false; selSpacer = null; render(); } } } });
+    var nm = el("input", { value: c.spacer_name }), ti = el("input", { value: c.spacer_title }), bd = el("textarea", { style: "min-height:140px" }), ex = el("textarea", {});
+    var img = el("input", { value: c.spacer_image || "", placeholder: "https://… 或 assets/…" }), cap = el("input", { value: c.spacer_image_caption || "" });
+    bd.value = c.spacer_body || ""; ex.value = c.spacer_explanation || "";
+    [nm, ti, bd, ex, img, cap].forEach(function (x) { x.addEventListener("input", function () { setDirty(true); }); });
+    var missing = !("spacer_body" in c);
+    body.appendChild(el("div", { cls: "card", id: "spacer-editor" },
+      el("div", { cls: "row" }, el("span", { cls: "fix" }, back), el("span", { cls: "fix muted small", text: c.name + " 區・版本 " + c.version })),
+      el("h2", { style: "margin:.6em 0 0", text: c.spacer_name + "・" + c.spacer_title }),
+      missing && el("p", { cls: "notice err", text: "資料庫尚未更新，隔珠的正文、說明與圖片還不能儲存。請先依說明在 Supabase 執行第二次資料庫更新。" }),
+      el("div", { cls: "grid2" }, el("div", {}, el("label", { text: "隔珠名稱（例：隔珠一）" }), nm), el("div", {}, el("label", { text: "隔珠標題（例：見、修（風瑜伽））" }), ti)),
+      el("label", { text: "原書正文" }), bd, el("label", { text: "整理說明（與原文分開）" }), ex,
+      imgRow(img, cap, "spacers"),
+      el("div", { cls: "actions" }, el("button", { cls: "primary", text: "儲存隔珠（草稿）", on: { click: function () {
+        rpc("save_spacer", { p: { id: c.id, spacer_name: nm.value, spacer_title: ti.value, spacer_body: bd.value, spacer_explanation: ex.value, spacer_image: img.value.trim(), spacer_image_caption: cap.value }, p_expected_version: c.version })
+          .then(function () { setDirty(false); notice("已儲存隔珠（草稿）。", "ok"); return reload(); }).catch(function (e) { notice(/save_spacer|function/i.test(e.message || "") && !/version_conflict|validation_failed|not_authorized/.test(e.message || "") ? "資料庫尚未更新，請先在 Supabase 執行第二次資料庫更新。" : errText(e), "err"); });
+      } } }))));
+  }
+
   /* ---------- 章節 ---------- */
   function viewChapters(body) {
     var left = el("div", { cls: "card" }), right = el("div", { cls: "card" });
@@ -277,16 +321,29 @@
     var list = el("div", { cls: "list" });
     S.chapters.forEach(function (c) { list.appendChild(el("button", { cls: selChapter === c.id ? "on" : "", on: { click: function () { if (confirmLeave()) { dirty = false; selChapter = c.id; render(); } } } }, el("span", { cls: "n", text: c.no }), el("span", { text: c.title }))); });
     left.appendChild(list);
+    left.appendChild(el("button", { style: "margin-top:8px", text: "＋ 新增章", on: { click: function () {
+      var ti = prompt("新章的章名："); if (!ti || !ti.trim()) return;
+      var vol = prompt("屬於第幾輯？（1–4，可留空）", "") || "";
+      rpc("create_chapter", { p: { title: ti.trim(), vols: /^[1-4]$/.test(vol.trim()) ? [+vol.trim()] : [] } })
+        .then(function (r) { selChapter = r.id; notice("已新增第 " + r.no + " 章（草稿），網站會自動為新章配置一顆數珠。", "ok"); return reload(); })
+        .catch(function (e) { notice(/create_chapter|function/i.test(e.message || "") && !/validation_failed|not_authorized/.test(e.message || "") ? "資料庫尚未更新，請先在 Supabase 執行第二次資料庫更新。" : errText(e), "err"); });
+    } } }));
     var c = S.chapters.find(function (x) { return x.id === selChapter; });
     if (!c) { right.appendChild(el("p", { cls: "muted", text: "← 選一章編輯章名、內文與節目。" })); return; }
     var title = el("input", { value: c.title }), cb = el("textarea", {}), ce = el("textarea", {});
+    var cimg = el("input", { value: c.image || "", placeholder: "https://… 或 assets/…" }), ccap = el("input", { value: c.image_caption || "" });
     cb.value = c.body || ""; ce.value = c.explanation || "";
-    [title, cb, ce].forEach(function (x) { x.addEventListener("input", function () { setDirty(true); }); });
+    [title, cb, ce, cimg, ccap].forEach(function (x) { x.addEventListener("input", function () { setDirty(true); }); });
     right.appendChild(el("div", {}, el("h2", { style: "margin:0", text: "第" + c.no + "章" }), el("p", { cls: "muted small", text: "版本 " + c.version + "・輯別 " + (c.vols || []).join("、") }),
       el("label", { text: "章名" }), title, el("label", { text: "本章原書正文" }), cb, el("label", { text: "本章整理說明" }), ce,
+      imgRow(cimg, ccap, "chapters"),
       el("div", { cls: "actions" }, el("button", { cls: "primary", text: "儲存章（草稿）", on: { click: function () {
-        rpc("save_chapter", { p: { id: c.id, title: title.value, body: cb.value, explanation: ce.value, image: c.image, image_caption: c.image_caption }, p_expected_version: c.version })
+        rpc("save_chapter", { p: { id: c.id, title: title.value, body: cb.value, explanation: ce.value, image: cimg.value.trim(), image_caption: ccap.value }, p_expected_version: c.version })
           .then(function () { setDirty(false); notice("已儲存（草稿）。", "ok"); return reload(); }).catch(function (e) { notice(errText(e), "err"); });
+      } } }),
+      isOwner() && el("button", { cls: "danger", text: "刪除本章", on: { click: function () {
+        if (prompt("刪除「第" + c.no + "章 " + c.title + "」及其所有節、目，無法復原（可由歷史版本還原）。請輸入章號 " + c.no + " 確認：") !== String(c.no)) return;
+        rpc("delete_chapter", { p_id: c.id }).then(function () { setDirty(false); selChapter = null; notice("已刪除（草稿）。", "ok"); return reload(); }).catch(function (e) { notice(errText(e), "err"); });
       } } }))));
     var tb = el("tbody");
     sectionsOf(c.id).forEach(function (s) {
@@ -297,6 +354,13 @@
       tb.appendChild(el("tr", {}, el("td", { style: "width:70px" }, (s.parent_id ? "└ 目 " : ""), no), el("td", {}, ti), el("td", { style: "width:110px" }, pg), el("td", { style: "width:70px" }, vol),
         el("td", { style: "white-space:nowrap" },
           el("button", { text: "內文", on: { click: function () { more.hidden = !more.hidden; } } }),
+          !s.parent_id && el("button", { text: "＋目", title: "在這一節下新增目", on: { click: function () {
+            var ti2 = prompt("在「" + s.title + "」下新增目，目的標題："); if (!ti2 || !ti2.trim()) return;
+            var items = sectionsOf(c.id).filter(function (x) { return x.parent_id === s.id; });
+            var maxSort = Math.max.apply(null, [s.sort].concat(items.map(function (x) { return x.sort; })));
+            rpc("save_section", { p: { id: s.id + "-i" + Date.now().toString(36), chapter_id: c.id, parent_id: s.id, no: String(items.length + 1), title: ti2.trim(), page: "", vol: s.vol == null ? "" : String(s.vol), sort: String(maxSort + 1) }, p_expected_version: 0 })
+              .then(function () { notice("已新增目（草稿）。", "ok"); return reload(); }).catch(function (e) { notice(errText(e), "err"); });
+          } } }),
           el("button", { cls: "primary", text: "儲存", on: { click: function () {
             rpc("save_section", { p: { id: s.id, no: no.value, title: ti.value, page: pg.value, vol: vol.value, body: sbody.value, explanation: sexp.value, image: s.image, image_caption: s.image_caption }, p_expected_version: s.version })
               .then(function () { setDirty(false); notice("已儲存（草稿）。", "ok"); return reload(); }).catch(function (e) { notice(errText(e), "err"); });
