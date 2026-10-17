@@ -7,7 +7,7 @@
   var KM, D, host, stage, renderer, scene, camera, controls, malaGroup, galaxyGroup, baseGroup;
   var GY = 1.85, R = 26, TAU = Math.PI * 2, FOV = 45, ZC = [0x6fe3f0, 0xffd27a, 0xc9a8ff, 0xff8f9d];
   var W = 1, H = 1, narrow = false, offX = 0, offY = 0;
-  var hulls = [], hoverHull = null, ray = null, beads = [], guru, tassel, stringMesh, ringLocal = [], segs = [], reading = false, readerEl = null, YAX = new THREE.Vector3(0, 1, 0), tmpQ = new THREE.Quaternion(), tmp3 = new THREE.Vector3(), tmp4 = new THREE.Vector3();
+  var walls = [], hulls = [], hoverHull = null, ray = null, beads = [], guru, tassel, stringMesh, ringLocal = [], segs = [], reading = false, readerEl = null, YAX = new THREE.Vector3(0, 1, 0), tmpQ = new THREE.Quaternion(), tmp3 = new THREE.Vector3(), tmp4 = new THREE.Vector3();
   var paused = false, reduce = false, lines = true, selected = null, focused = false, mode = "mala", labelSet = "parts";
   var hover = null, down = null, userDrag = false, spinV = 0, bobAmp = 1, tt = 0, rotTween = null, built = false;
   var labelDefs = [], labelEls = [], fanEls = [], leaderPaths = {};
@@ -249,8 +249,77 @@
     });
     tassel.traverse(function (o) { if (o.isMesh) o.castShadow = true; });
     var tbx = new T.Object3D(); tbx.position.set(0, -2.2, 0.32); tassel.add(tbx); tassel.userData.hit = tbx;
-    buildHulls();
+    buildHulls(); buildWalls();
     cands.push({ act: "part:tassel", obj: tbx, rad: 1.6 });
+  }
+
+  /* ---------- 見修行果四面光牆（極簡：沿用琉璃罩體四色；右上大字、直書說明文繞圖、最左提示語） ---------- */
+  var WALLC = [ // 與原琉璃罩體同色：見藍、修金、行紫、果紅
+    { tint: [95, 149, 204], ink: "#244a73" },
+    { tint: [214, 160, 60], ink: "#6e4a0e" },
+    { tint: [142, 120, 208], ink: "#3f2f7a" },
+    { tint: [210, 104, 93], ink: "#7a2a22" }];
+  var WALL_H = 800, WALL_FONT = "'Noto Serif TC Site','Noto Serif TC','Songti TC',serif";
+  var ROT = "「」『』（）〔〕—－…⋯～"; // 直書時需轉 90° 的符號
+  var PUN = "、，。：；！？";            // 直書時置於格子右上的標點
+  function vchar(c, ch, x, y, size) { // 以 (x,y) 為格子中心畫一個直書字
+    if (ROT.indexOf(ch) >= 0) { c.save(); c.translate(x, y); c.rotate(Math.PI / 2); c.fillText(ch, 0, 0); c.restore(); }
+    else if (PUN.indexOf(ch) >= 0) c.fillText(ch, x + size * 0.28, y - size * 0.22);
+    else c.fillText(ch, x, y);
+  }
+  function wallLayout(c, zn, w, h) { // 先算出右側（大字＋直書說明）與左側（提示語）的位置，兩組往中間聚集、中間留一小段空
+    var BIG = 360, FS = 60, STEP = FS * 1.16, COL = FS * 1.7, top = 60, bottom = h - 90, text = zn.core || zn.summary || "";
+    var cols = [], i = 0, x = 0; // 以大字右緣為 0，往左排欄
+    while (i < text.length) {
+      var under = x > -BIG - 10, y = (under ? top + BIG + 30 : top + 20) + STEP / 2, col = [];
+      while (i < text.length && (y < bottom || (PUN.indexOf(text[i]) >= 0 && y < bottom + STEP))) { col.push([text[i], y]); y += STEP; i++; }
+      cols.push({ x: x - COL / 2, items: col }); x -= COL;
+    }
+    var blockW = Math.max(BIG, -x), gap = Math.min(w * 0.14, 360), HS = 46;
+    var total = blockW + gap + HS * 1.6, right = Math.min(w - 90, w / 2 + total / 2); // 整組置中
+    return { BIG: BIG, FS: FS, HS: HS, bigX: right - BIG / 2, bigY: top + BIG / 2 + 10, cols: cols, right: right, hintX: right - blockW - gap - HS * 0.8 };
+  }
+  function drawWall(cv, zi, glowCv) {
+    var zn = D.zones[zi], C = WALLC[zi], c = cv.getContext("2d"), w = cv.width, h = cv.height, t = C.tint.join(",");
+    // 發光層（另一張貼圖、以加亮方式疊上）：牆體柔柔發光，下緣暗、往上亮，兩端淡出，沒有邊框
+    var gc = glowCv.getContext("2d"); gc.clearRect(0, 0, w, h);
+    var g = gc.createLinearGradient(0, h, 0, 0); g.addColorStop(0, "rgba(" + t + ",0)"); g.addColorStop(0.3, "rgba(" + t + ",0.10)"); g.addColorStop(0.75, "rgba(" + t + ",0.2)"); g.addColorStop(1, "rgba(" + t + ",0.24)");
+    gc.fillStyle = g; gc.fillRect(0, 0, w, h);
+    var rg = gc.createRadialGradient(w / 2, h * 0.38, 10, w / 2, h * 0.38, Math.max(w, h) * 0.55); rg.addColorStop(0, "rgba(255,255,255,0.06)"); rg.addColorStop(1, "rgba(255,255,255,0)");
+    gc.fillStyle = rg; gc.fillRect(0, 0, w, h);
+    gc.globalCompositeOperation = "destination-in"; var eg = gc.createLinearGradient(0, 0, w, 0);
+    eg.addColorStop(0, "rgba(0,0,0,0)"); eg.addColorStop(0.1, "#000"); eg.addColorStop(0.9, "#000"); eg.addColorStop(1, "rgba(0,0,0,0)");
+    gc.fillStyle = eg; gc.fillRect(0, 0, w, h);
+    var tg = gc.createLinearGradient(0, 0, 0, h); tg.addColorStop(0, "rgba(0,0,0,0.6)"); tg.addColorStop(0.06, "#000"); tg.addColorStop(1, "#000"); // 上緣柔化，不留硬邊
+    gc.fillStyle = tg; gc.fillRect(0, 0, w, h); gc.globalCompositeOperation = "source-over";
+    // 文字層：該區深色字，帶透明度
+    c.clearRect(0, 0, w, h);
+    var L = wallLayout(c, zn, w, h);
+    c.fillStyle = C.ink; c.textAlign = "center"; c.textBaseline = "middle"; c.globalAlpha = 0.82;
+    c.font = "700 " + L.BIG + "px " + WALL_FONT; c.fillText(zn.name, L.bigX, L.bigY);
+    c.globalAlpha = 0.72; c.font = "500 " + L.FS + "px " + WALL_FONT;
+    L.cols.forEach(function (col) { col.items.forEach(function (it) { vchar(c, it[0], L.right + col.x, it[1], L.FS); }); });
+    var hint = "—點擊展開「" + zn.name + "」區名相—", hstep = L.HS * 1.1, hy = (h - hint.length * hstep) / 2 + hstep / 2 - 20;
+    c.globalAlpha = 0.62; c.font = "700 " + L.HS + "px " + WALL_FONT;
+    for (var k = 0; k < hint.length; k++) vchar(c, hint[k], L.hintX, hy + k * hstep, L.HS);
+    c.globalAlpha = 1;
+  }
+  function buildWalls() { // 每區一面弧形光牆：從隔珠到該區「有內容」的最後一顆珠；四面各自獨立；文字朝外，轉到背面為反字
+    var WH = R * 0.48, Y0 = 0.9;
+    D.zones.forEach(function (zn, zi) {
+      var runs = zoneRuns(zi), lastN = runs.length ? runs[runs.length - 1][1] : zn.last;
+      var a0 = ANG[zn.spacerNo], a1 = ANG[lastN], pad = TAU / 108 * 0.7, lo = Math.min(a0, a1) - pad, hi = Math.max(a0, a1) + pad;
+      var cw = Math.min(4096, Math.round(WALL_H * (R * (hi - lo)) / WH));
+      var cv = document.createElement("canvas"), gv = document.createElement("canvas"); cv.width = gv.width = cw; cv.height = gv.height = WALL_H; drawWall(cv, zi, gv);
+      var tex = new T.CanvasTexture(cv), gtex = new T.CanvasTexture(gv); [tex, gtex].forEach(function (x) { x.anisotropy = 8; if (T.sRGBEncoding) x.encoding = T.sRGBEncoding; });
+      var geo = new T.CylinderGeometry(R, R, WH, 96, 1, true, lo, hi - lo);
+      var gmat = new T.MeshBasicMaterial({ map: gtex, transparent: true, opacity: 0.45, side: T.DoubleSide, depthWrite: false, toneMapped: false, blending: T.AdditiveBlending });
+      var mat = new T.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0.85, side: T.DoubleSide, depthWrite: false, toneMapped: false });
+      var m = new T.Mesh(geo, mat), gm = new T.Mesh(geo, gmat); gm.renderOrder = 3; m.renderOrder = 4; m.add(gm);
+      m.position.y = Y0 + WH / 2; m.userData = { zone: zi, mat: mat, gmat: gmat, cv: cv, gv: gv, tex: tex, gtex: gtex }; m.visible = false;
+      malaGroup.add(m); walls[zi] = m;
+    });
+    if (document.fonts && document.fonts.load) document.fonts.load("700 100px 'Noto Serif TC Site'", "見修行果").then(function () { walls.forEach(function (m, zi) { drawWall(m.userData.cv, zi, m.userData.gv); m.userData.tex.needsUpdate = true; }); });
   }
   function buildHulls() { // 見修行果四區的半透明罩體：沿圓弧包住每區 26 顆數珠，像一段磨砂琉璃
     var TINT = [0x5f95cc, 0xd6a03c, 0x8e78d0, 0xd2685d];
@@ -259,7 +328,7 @@
       var outer = new T.MeshPhysicalMaterial({ color: TINT[zi], transparent: true, opacity: 0.17, roughness: 0.22, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.08, envMapIntensity: 1.5, depthWrite: false, side: T.FrontSide, emissive: TINT[zi], emissiveIntensity: 0.12 });
       var inner = new T.MeshPhysicalMaterial({ color: TINT[zi], transparent: true, opacity: 0.07, roughness: 0.5, depthWrite: false, side: T.BackSide });
       outer.onBeforeCompile = function (sh) { // 琉璃邊緣：越靠輪廓越不透明，形成柔和的玻璃邊光
-        sh.fragmentShader = sh.fragmentShader.replace("#include <dithering_fragment>", "#include <dithering_fragment>\n float fres = pow(1.0 - abs(dot(normalize(vViewPosition), normal)), 2.2);\n gl_FragColor.rgb = mix(gl_FragColor.rgb, gl_FragColor.rgb * 0.82, fres);\n gl_FragColor.a = clamp(opacity * (0.55 + 3.2 * fres), 0.0, 0.85);");
+        sh.fragmentShader = sh.fragmentShader.replace("#include <dithering_fragment>", "#include <dithering_fragment>\n float fres = pow(1.0 - abs(dot(normalize(vViewPosition), normal)), 2.2);\n gl_FragColor.rgb = mix(gl_FragColor.rgb, gl_FragColor.rgb * 0.94, fres);\n gl_FragColor.a = clamp(opacity * (0.75 + 1.1 * fres), 0.0, 0.42);");
       };
       // 隔珠在各區之前：隔珠＋緊接其後的有內容珠段，做成「一整個」平滑封閉的琉璃泡（單一網格，無接縫、無重疊）
       var spN = zn.spacerNo, joined = runs.length && runs[0][0] === zn.first;
@@ -308,10 +377,16 @@
     return runs;
   }
   function syncHulls() {
-    var on = labelSet === "terms" && !reading;
+    var on = labelSet === "terms" && !reading, selZ0 = selected && selected.k === "zone" ? selected.z : null;
+    walls.forEach(function (m, zi) { // 光牆只在名相頁總覽顯示；滑過時該面變亮、其他面變淡
+      m.visible = on && selZ0 == null && !selected;
+      var tgt = hoverHull == null ? 0.85 : hoverHull === zi ? 1 : 0.4;
+      G.to(m.userData.mat, { opacity: tgt, duration: 0.3 }); G.to(m.userData.gmat, { opacity: hoverHull === zi ? 0.7 : hoverHull == null ? 0.45 : 0.25, duration: 0.3 });
+      G.to(m.scale, { x: hoverHull === zi ? 1.015 : 1, y: hoverHull === zi ? 1.04 : 1, z: hoverHull === zi ? 1.015 : 1, duration: 0.3 });
+    });
     hulls.forEach(function (g, zi) {
       var selZ = selected && selected.k === "zone" ? selected.z : null;
-      g.visible = on && (selZ == null || selZ === zi);
+      g.visible = on && (selZ == null || selZ === zi); // 琉璃罩體與光牆並存
       g.userData.outer.opacity = selZ === zi ? 0.06 : hoverHull === zi ? 0.34 : 0.22;
       g.userData.outer.emissiveIntensity = hoverHull === zi ? 0.4 : 0.12;
     });
@@ -366,6 +441,7 @@
   /* ---------- 版面 ---------- */
   function overviewPos() {
     var f = Math.max(1, 1.5 / aEff()) * (narrow ? 1.2 : 1); // 手機：念珠縮小一些，左右留出標題的位置
+    if (labelSet === "terms") { var ft = narrow ? Math.max(1, 1.5 / aEff()) * 0.95 : f; return new T.Vector3(0, 19 * ft, 64 * ft); } // 名相頁（含手機）：傾角較小，光牆上的字較正
     return narrow && W < H * 1.1 ? new T.Vector3(0, 50 * f, 44 * f) : new T.Vector3(0, 30 * f, 60 * f); // 手機畫面較高：鏡頭抬高，念珠橢圓較圓、填滿上下空間
   }
   function resize() {
@@ -641,7 +717,7 @@
       if (best && best.bead && (best.bead.spacer || KM.BEADS[best.bead.n].term)) return { act: "zone:" + best.bead.z, hull: best.bead.z }; // 空白珠不可點
       if (!ray) ray = new T.Raycaster();
       ray.setFromCamera({ x: cx / W * 2 - 1, y: -(cy / H) * 2 + 1 }, camera);
-      var hit = ray.intersectObjects(hulls.filter(function (g) { return g.visible; }), true)[0];
+      var hit = ray.intersectObjects(walls.filter(function (g) { return g.visible; }).concat(hulls.filter(function (g) { return g.visible; })), true).filter(function (h) { return h.object.userData.zone != null; })[0];
       return hit ? { act: "zone:" + hit.object.userData.zone, hull: hit.object.userData.zone } : null;
     }
     if (best) {
@@ -697,7 +773,7 @@
   API.setPaused = function (v) { paused = !!v; };
   API.opacityOf = function (n) { return beads[n].core.material.opacity; };
   API.isReading = function () { return reading; };
-  API.hullsVisible = function () { return hulls.filter(function (g) { return g.visible; }).length; };
+  API.hullsVisible = function () { return walls.filter(function (g) { return g.visible; }).length; };
   API.cordCheck = function () { // 串繩段兩端是否貼在相鄰兩顆珠的珠孔上（擺動中也成立）
     var worst = 0, bob = 0, v = new T.Vector3(), d = new T.Vector3();
     for (var n = 1; n <= 108; n++) {

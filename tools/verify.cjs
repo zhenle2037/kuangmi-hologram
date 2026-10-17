@@ -80,7 +80,7 @@ const { chromium } = require('playwright');
   await home(p); await p.waitForTimeout(WAIT);
   await p.click('#mode-terms'); await p.waitForTimeout(2500);
   { await p.mouse.move(5, 890); await p.click('#motion'); await p.waitForTimeout(1500); const r0 = await p.evaluate(() => KM3D.stats().rotY); await p.waitForTimeout(5000); const r1 = await p.evaluate(() => KM3D.stats().rotY); await p.click('#motion'); await p.waitForTimeout(500); ok('名相頁總覽：念珠會自轉（與其他頁相同）', Math.abs(r1 - r0) > 0.001, (r1 - r0).toFixed(4)); }
-  ok('名相頁總覽：只標四顆隔珠，四區各有半透明罩體', await p.evaluate(() => [...document.querySelectorAll('.lab-terms')].filter(e => e.style.display !== 'none').length === 4 && KM3D.hullsVisible() === 4));
+  ok('名相頁總覽：只標四顆隔珠，四區各有光牆與琉璃罩體', await p.evaluate(() => [...document.querySelectorAll('.lab-terms')].filter(e => e.style.display !== 'none').length === 4 && KM3D.hullsVisible() === 4));
   ok('名相頁面板列出四區全部名相', (await pane(p)).includes('如來藏') && (await pane(p)).includes('密宗之中有解脫') && (await pane(p)).includes('三昧耶戒'));
   if (shots) await p.screenshot({ path: shots + '/d-terms.png' });
   const hb = await p.evaluate(() => KM3D.screenOf(40)); await p.mouse.click(hb.x, hb.y + 3); await p.waitForTimeout(600);
