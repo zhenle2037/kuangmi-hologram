@@ -129,6 +129,7 @@
     document.body.classList.toggle("mode-book", m === "book"); document.body.classList.toggle("mode-terms", m === "terms"); document.body.classList.toggle("mode-mala", m === "mala");
     ["mala", "terms", "book"].forEach(function (k) { $("#mode-" + k).setAttribute("aria-pressed", m === k); });
     if (has3D) window.KM3D.setMode(m);
+    if ($("#chsel-lab")) buildJump();
     if (!quiet) select(null);
   }
   function syncNav() {
@@ -380,8 +381,37 @@
     });
     h += '<h4>其他目次入口</h4><ul class="toc">' + D.extras.map(function (x) { return '<li><button class="trow" data-go="extra:' + x.id + '"><span>' + esc(x.title) + (x.vol ? "（" + VOLNAME(x.vol) + "）" : "") + "</span><i>" + esc(x.page) + "</i></button></li>"; }).join("") + "</ul>";
     $("#pane-toc").innerHTML = h;
-    $("#chsel").innerHTML = '<option value="">— 選擇章節 —</option>' + D.chapters.map(function (c) { return '<option value="chapter:' + c.id + '">' + chLabel(c) + " " + esc(c.title) + "</option>"; }).join("") +
-      D.extras.map(function (x) { return '<option value="extra:' + x.id + '">' + esc(x.title) + (x.vol ? "（" + VOLNAME(x.vol) + "）" : "") + "</option>"; }).join("");
+    buildJump();
+  }
+  // 上方快速選單：依頁面切換——以數珠為喻＝念珠部件、見修行果名相＝四區與名相、原書導讀＝章節
+  function buildJump() {
+    var lab = $("#chsel-lab"), h;
+    if (mode === "mala") {
+      lab.textContent = "部件";
+      h = '<option value="">— 選擇部件 —</option>' + PART_KEYS.map(function (k) { return '<option value="part:' + k + '">' + esc(D.parts[k].title) + "</option>"; }).join("") +
+        '<optgroup label="四顆隔珠">' + D.zones.map(function (zn) { return '<option value="spacer:' + zn.idx + '">隔珠・' + esc(zn.name) + "</option>"; }).join("") + "</optgroup>";
+    } else if (mode === "terms") {
+      lab.textContent = "四區";
+      h = '<option value="">— 選擇區或名相 —</option>' + D.zones.map(function (zn) {
+        var ts = D.terms.filter(function (t) { return t.group === zn.group && t.slot; }).sort(function (a, b) { return a.slot - b.slot; });
+        return '<optgroup label="' + esc(zn.name) + ' 區">' + '<option value="zone:' + zn.idx + '">' + esc(zn.name) + " 區（全部名相）</option>" +
+          ts.map(function (t) { return '<option value="bead:' + t.slot + '">　' + esc(t.name) + "</option>"; }).join("") + "</optgroup>";
+      }).join("");
+    } else {
+      lab.textContent = "章節";
+      h = '<option value="">— 選擇章節 —</option>' + D.chapters.map(function (c) { return '<option value="chapter:' + c.id + '">' + chLabel(c) + " " + esc(c.title) + "</option>"; }).join("") +
+        D.extras.map(function (x) { return '<option value="extra:' + x.id + '">' + esc(x.title) + (x.vol ? "（" + VOLNAME(x.vol) + "）" : "") + "</option>"; }).join("");
+    }
+    $("#chsel").innerHTML = h; $("#chsel").setAttribute("aria-label", lab.textContent + "快速選單"); syncJump();
+  }
+  function syncJump() {
+    var v = "";
+    if (sel) {
+      if (mode === "book") { var cid = sel.k === "chapter" ? sel.id : sel.k === "sec" ? secById[sel.id].ch : null; v = cid ? "chapter:" + cid : sel.k === "extra" ? "extra:" + sel.id : ""; }
+      else if (mode === "mala") v = sel.k === "part" ? "part:" + sel.id : sel.k === "spacer" ? "spacer:" + sel.z : "";
+      else v = sel.k === "zone" ? "zone:" + sel.z : sel.k === "bead" ? "bead:" + sel.n : "";
+    }
+    var s2 = $("#chsel"); s2.value = v; if (s2.value !== v) s2.value = "";
   }
   function syncToc() {
     var cid = sel && sel.k === "chapter" ? sel.id : sel && sel.k === "sec" ? secById[sel.id].ch : null;
@@ -390,7 +420,7 @@
       b.classList.toggle("on", !!(sel && (a === sel.k + ":" + (sel.id))));
     });
     document.querySelectorAll("#pane-toc details").forEach(function (d) { if (d.getAttribute("data-ch") === cid) d.open = true; });
-    $("#chsel").value = cid ? "chapter:" + cid : sel && sel.k === "extra" ? "extra:" + sel.id : "";
+    syncJump();
   }
   function showTab(name) {
     var c = name === "content";
