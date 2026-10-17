@@ -275,6 +275,41 @@ window.supabase = { createClient: function () {
   await page.click('button:has-text("刪除本章")'); await page.waitForTimeout(800);
   ok('章節：Owner 刪除新章', (await rpc('owner@example.com', 'admin_load', {})).data.chapters.length === 17);
 
+  /* 11c. 節與目表格對齊、空珠新增名相、拖曳換位 */
+  await page.click('.list button:has(span:text-is("1"))'); await page.waitForTimeout(400);
+  if (process.env.SHOTS) { const tbl = await page.$('.sec-table'); await tbl.screenshot({ path: path.join(process.env.SHOTS, '後台-節與目.png') }); }
+  const lay = await page.evaluate(() => { const sec = document.querySelector('.sec-table tr.row-sec'), it = document.querySelector('.sec-table tr.row-item');
+    const x = (r, sel) => r.querySelector(sel).getBoundingClientRect().left;
+    return { secNo: x(sec, 'td:first-child input'), itemNo: x(it, 'td.c-item input'), secSave: x(sec, '.acts button.primary'), itemSave: x(it, '.acts button.primary'), secDel: x(sec, '.acts button.danger'), itemDel: x(it, '.acts button.danger') }; });
+  ok('節與目：目的編號往右一格，儲存／刪除按鈕上下對齊', lay.itemNo > lay.secNo + 30 && Math.abs(lay.secSave - lay.itemSave) < 1 && Math.abs(lay.secDel - lay.itemDel) < 1, JSON.stringify(lay));
+  await tab('108 珠位');
+  if (process.env.SHOTS) await page.screenshot({ path: path.join(process.env.SHOTS, '後台-108珠位.png') });
+  ok('隔珠格不是紅色（深米色）', await page.$eval('.bead.spacer', e => getComputedStyle(e).backgroundColor) === 'rgb(228, 218, 200)');
+  answers = ['測試新名相'];
+  await page.click('.bead.empty[data-n="18"]'); await page.waitForTimeout(1200);
+  let dd = (await rpc('owner@example.com', 'admin_load', {})).data;
+  const nt18 = dd.terms.find(t => t.name === '測試新名相');
+  ok('點空珠直接新增名相並放在該珠，進入編輯', nt18 && nt18.slot === 18 && await page.isVisible('#term-editor') && (await page.textContent('#term-editor h2')) === '測試新名相');
+  await tab('108 珠位');
+  const drag = async (from, to) => { const a = await page.$('.bead[data-n="' + from + '"]'), b = await page.$('.bead[data-n="' + to + '"]'); const ra = await a.boundingBox(), rb = await b.boundingBox();
+    await page.mouse.move(ra.x + ra.width / 2, ra.y + ra.height / 2); await page.mouse.down(); await page.mouse.move(ra.x + ra.width / 2 + 20, ra.y + ra.height / 2 + 10, { steps: 4 });
+    await page.mouse.move(rb.x + rb.width / 2, rb.y + rb.height / 2, { steps: 8 }); await page.mouse.up(); await page.waitForTimeout(1500); };
+  await drag(18, 20);
+  dd = (await rpc('owner@example.com', 'admin_load', {})).data;
+  ok('拖曳到空珠：移位（18→20）', dd.terms.find(t => t.id === nt18.id).slot === 20);
+  const t1 = dd.terms.find(t => t.slot === 1);
+  await drag(20, 1);
+  dd = (await rpc('owner@example.com', 'admin_load', {})).data;
+  ok('拖曳到有名相的珠：兩者對調（20↔1）', dd.terms.find(t => t.id === nt18.id).slot === 1 && dd.terms.find(t => t.id === t1.id).slot === 20);
+  await drag(1, 30);
+  ok('拖到別區被擋下並提示', /只能在同一區內移動/.test(await noticeTxt()) && (await rpc('owner@example.com', 'admin_load', {})).data.terms.find(t => t.id === nt18.id).slot === 1);
+  await drag(1, 20); // 換回
+  const tt = (await rpc('owner@example.com', 'admin_load', {})).data.terms.find(t => t.id === nt18.id);
+  await rpc('owner@example.com', 'delete_term', { p_id: tt.id });
+  ok('換回後原名相回到第 1 顆', (await rpc('owner@example.com', 'admin_load', {})).data.terms.find(t => t.id === t1.id).slot === 1);
+  const clickT = await page.$('.bead[data-n="2"]'); await clickT.click(); await page.waitForTimeout(500);
+  ok('點名相珠（不拖曳）進入編輯', await page.isVisible('#term-editor'));
+
   /* 12. 撤銷權限 */
   await tab('成員權限'); answers = [true];
   await page.locator('tr', { hasText: 'editor@example.com' }).locator('button:has-text("撤銷")').click(); await page.waitForTimeout(600);

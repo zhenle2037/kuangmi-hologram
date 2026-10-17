@@ -269,31 +269,88 @@
   }
 
   /* ---------- 108 珠位 ---------- */
+  function termPayload(t, slot) { return { id: t.id, name: t.name, primary_category: t.primary_category, show: t.show, slot: slot, notes: t.notes, body: t.body, explanation: t.explanation, image: t.image, image_caption: t.image_caption, refs: t.refs }; }
+  function moveTerm(t, from, to, other) { // 拖曳換位：移到空珠，或與同區另一顆對調（先騰出珠位再互換）
+    var p;
+    if (!other) p = rpc("save_term", { p: termPayload(t, to), p_expected_version: t.version });
+    else p = rpc("save_term", { p: termPayload(t, null), p_expected_version: t.version })
+      .then(function () { return rpc("save_term", { p: termPayload(other, from), p_expected_version: other.version }); })
+      .then(function () { return rpc("save_term", { p: termPayload(t, to), p_expected_version: t.version + 1 }); });
+    return p.then(function () { notice(other ? "已將「" + t.name + "」與「" + other.name + "」對調（草稿）。" : "已將「" + t.name + "」移到第 " + to + " 顆（草稿）。", "ok"); return reload(); })
+      .catch(function (e) { notice(errText(e), "err"); return reload(); });
+  }
+  function newTermAt(c, n) { // 點空珠：直接在這顆珠新增名相
+    var name = prompt("在第 " + n + " 顆（" + c.name + " 區）新增名相，名稱："); if (!name || !name.trim()) return;
+    rpc("create_term", { p_name: name.trim(), p_category: c.id }).then(function (r) {
+      return rpc("admin_load").then(function (d) {
+        var t = d.terms.find(function (x) { return x.id === r.id; });
+        return rpc("save_term", { p: termPayload(t, n), p_expected_version: t.version });
+      }).then(function () { selTerm = r.id; tab = "terms"; notice("已在第 " + n + " 顆新增「" + name.trim() + "」（草稿），請填寫內容後儲存。", "ok"); return reload(); });
+    }).catch(function (e) { notice(errText(e), "err"); });
+  }
   function viewBeads(body) {
     if (selSpacer) return viewSpacer(body, S.categories.find(function (x) { return x.id === selSpacer; }));
-    body.appendChild(el("p", { cls: "muted small", text: "108 顆固定，不可增刪。每區隔珠在前、名相珠在後。點已配置的珠可編輯名相；點空珠可把同區的名相移過來。" }));
+    body.appendChild(el("p", { cls: "muted small", text: "108 顆固定，不可增刪。每區隔珠在前、名相珠在後。點隔珠或名相可編輯；點空珠可直接新增名相；按住名相拖到同區的另一顆珠，可移位或對調。" }));
     var order = [108].concat(Array.from({ length: 107 }, function (_, i) { return i + 1; }));
     S.categories.forEach(function (c) {
-      var grid = el("div", { cls: "beads" });
+      var grid = el("div", { cls: "beads", "data-cat": c.id });
       order.filter(function (n) { var b = S.beads[n - 1]; return b.category_id === c.id; }).forEach(function (n) {
         var b = S.beads[n - 1], t = b.term_id && S.terms.find(function (x) { return x.id === b.term_id; });
-        var cell = el("button", { cls: "bead" + (b.kind === "spacer" ? " spacer" : t ? "" : " empty") }, el("small", { text: "第 " + n + " 顆" + (b.kind === "spacer" ? "・隔珠" : "") }), el("span", { text: b.kind === "spacer" ? c.spacer_name + "・" + c.spacer_title : t ? t.name : "（空）" }));
+        var cell = el("button", { cls: "bead" + (b.kind === "spacer" ? " spacer" : t ? " has" : " empty"), "data-n": n, "data-cat": c.id }, el("small", { text: "第 " + n + " 顆" + (b.kind === "spacer" ? "・隔珠" : "") }), el("span", { text: b.kind === "spacer" ? c.spacer_name + "・" + c.spacer_title : t ? t.name : "（空）＋ 新增" }));
         if (b.kind === "spacer") cell.addEventListener("click", function () { selSpacer = c.id; render(); });
-        if (b.kind !== "spacer") cell.addEventListener("click", function () {
-          if (t) { selTerm = t.id; tab = "terms"; render(); return; }
-          var cands = S.terms.filter(function (x) { return x.primary_category === c.id && !x.archived; });
-          var names = cands.map(function (x, i) { return (i + 1) + ". " + x.name + (x.slot ? "（目前在第 " + x.slot + " 顆）" : "（未配置）"); }).join("\n");
-          var k = prompt("把哪個名相放到第 " + n + " 顆？輸入編號：\n" + names); if (!k) return;
-          var pick = cands[+k - 1]; if (!pick) return;
-          rpc("save_term", { p: { id: pick.id, name: pick.name, primary_category: pick.primary_category, show: pick.show, slot: n, notes: pick.notes, body: pick.body, explanation: pick.explanation, image: pick.image, image_caption: pick.image_caption, refs: pick.refs }, p_expected_version: pick.version })
-            .then(function () { notice("已將「" + pick.name + "」移到第 " + n + " 顆（草稿）。", "ok"); return reload(); }).catch(function (e) { notice(errText(e), "err"); });
-        });
+        else if (!t) cell.addEventListener("click", function () { if (!cell.dataset.dropped) newTermAt(c, n); });
+        else dragSource(cell, t, n, c);
         grid.appendChild(cell);
       });
       body.appendChild(el("div", { cls: "zone card" }, el("h3", { text: c.name + " 區・" + c.spacer_name }), grid));
     });
   }
-
+  function dragSource(cell, t, n, c) { // 按住拖曳（滑鼠與觸控皆可）；未移動就是點擊 → 編輯名相
+    var st = null;
+    cell.addEventListener("pointerdown", function (e) {
+      if (e.button !== 0) return;
+      st = { x: e.clientX, y: e.clientY, drag: false, timer: e.pointerType === "mouse" ? 0 : setTimeout(function () { if (st && !st.drag) begin(e); }, 350) }; // 觸控：長按約 0.35 秒後開始拖曳
+      cell.setPointerCapture(e.pointerId);
+    });
+    function begin(e) {
+      st.drag = true; clearTimeout(st.timer);
+      var r = cell.getBoundingClientRect();
+      st.ghost = cell.cloneNode(true); st.ghost.className = "bead has ghost"; st.ghost.style.width = r.width + "px"; st.ghost.style.height = r.height + "px";
+      st.dx = st.x - r.left; st.dy = st.y - r.top; document.body.appendChild(st.ghost); cell.classList.add("dragging"); document.body.classList.add("is-dragging");
+      place(st.x, st.y);
+    }
+    function place(x, y) {
+      st.ghost.style.transform = "translate(" + (x - st.dx) + "px," + (y - st.dy) + "px)";
+      var tgt = target(x, y); document.querySelectorAll(".bead.drop-ok,.bead.drop-no").forEach(function (b) { b.classList.remove("drop-ok", "drop-no"); });
+      if (tgt && tgt !== cell) tgt.classList.add(tgt.dataset.cat === c.id && !tgt.classList.contains("spacer") ? "drop-ok" : "drop-no");
+    }
+    function target(x, y) { st.ghost.style.display = "none"; var el2 = document.elementFromPoint(x, y); st.ghost.style.display = ""; return el2 && el2.closest && el2.closest(".bead"); }
+    cell.addEventListener("pointermove", function (e) {
+      if (!st) return;
+      if (!st.drag && e.pointerType === "mouse" && Math.hypot(e.clientX - st.x, e.clientY - st.y) > 6) begin(e);
+      if (!st.drag && e.pointerType !== "mouse" && Math.hypot(e.clientX - st.x, e.clientY - st.y) > 10) { clearTimeout(st.timer); st = null; return; } // 觸控時先移動＝捲動頁面
+      if (st.drag) { e.preventDefault(); place(e.clientX, e.clientY); }
+    });
+    function end(e, cancel) {
+      if (!st) return; clearTimeout(st.timer);
+      var was = st.drag, tgt = was ? target(e.clientX, e.clientY) : null;
+      if (st.ghost) st.ghost.remove(); cell.classList.remove("dragging"); document.body.classList.remove("is-dragging");
+      document.querySelectorAll(".bead.drop-ok,.bead.drop-no").forEach(function (b) { b.classList.remove("drop-ok", "drop-no"); });
+      st = null;
+      if (cancel) return;
+      if (!was) { selTerm = t.id; tab = "terms"; render(); return; }
+      if (!tgt || tgt === cell) return;
+      var to = +tgt.dataset.n;
+      if (tgt.classList.contains("spacer")) { notice("名相不能放到隔珠。", "err"); return; }
+      if (tgt.dataset.cat !== c.id) { notice("只能在同一區內移動（名相的主分類決定所在區）。", "err"); return; }
+      var otherId = S.beads[to - 1].term_id, other = otherId && S.terms.find(function (x) { return x.id === otherId; });
+      moveTerm(t, n, to, other);
+    }
+    cell.addEventListener("pointerup", function (e) { end(e, false); });
+    cell.addEventListener("pointercancel", function (e) { end(e, true); });
+    cell.addEventListener("click", function (e) { e.preventDefault(); if (e.detail === 0) { selTerm = t.id; tab = "terms"; render(); } }); // 鍵盤 Enter 也能進入編輯
+  }
+  document.addEventListener("touchmove", function (e) { if (document.body.classList.contains("is-dragging")) e.preventDefault(); }, { passive: false }); // 拖曳中不捲動頁面
   function viewSpacer(body, c) { // 隔珠編輯：名稱、標題、原書正文、整理說明、圖片
     var back = el("button", { text: "‹ 回到 108 珠位", on: { click: function () { if (confirmLeave()) { dirty = false; selSpacer = null; render(); } } } });
     var nm = el("input", { value: c.spacer_name }), ti = el("input", { value: c.spacer_title }), bd = el("textarea", { style: "min-height:140px" }), ex = el("textarea", {});
@@ -347,32 +404,37 @@
       } } }))));
     var tb = el("tbody");
     sectionsOf(c.id).forEach(function (s) {
+      var isItem = !!s.parent_id;
       var no = el("input", { value: s.no }), ti = el("input", { value: s.title }), pg = el("input", { value: s.page }), vol = el("input", { value: s.vol == null ? "" : s.vol, type: "number", min: 1, max: 4 });
       var sbody = el("textarea", {}), sexp = el("textarea", {}); sbody.value = s.body || ""; sexp.value = s.explanation || "";
-      var more = el("tr", { hidden: true }, el("td", { colspan: 5 }, el("label", { text: "原書正文" }), sbody, el("label", { text: "整理說明" }), sexp));
+      var more = el("tr", { hidden: true }, el("td", { colspan: 6 }, el("label", { text: "原書正文" }), sbody, el("label", { text: "整理說明" }), sexp));
       [no, ti, pg, vol, sbody, sexp].forEach(function (x) { x.addEventListener("input", function () { setDirty(true); }); });
-      tb.appendChild(el("tr", {}, el("td", { style: "width:70px" }, (s.parent_id ? "└ 目 " : ""), no), el("td", {}, ti), el("td", { style: "width:110px" }, pg), el("td", { style: "width:70px" }, vol),
-        el("td", { style: "white-space:nowrap" },
-          el("button", { text: "內文", on: { click: function () { more.hidden = !more.hidden; } } }),
-          !s.parent_id && el("button", { text: "＋目", title: "在這一節下新增目", on: { click: function () {
-            var ti2 = prompt("在「" + s.title + "」下新增目，目的標題："); if (!ti2 || !ti2.trim()) return;
-            var items = sectionsOf(c.id).filter(function (x) { return x.parent_id === s.id; });
-            var maxSort = Math.max.apply(null, [s.sort].concat(items.map(function (x) { return x.sort; })));
-            rpc("save_section", { p: { id: s.id + "-i" + Date.now().toString(36), chapter_id: c.id, parent_id: s.id, no: String(items.length + 1), title: ti2.trim(), page: "", vol: s.vol == null ? "" : String(s.vol), sort: String(maxSort + 1) }, p_expected_version: 0 })
-              .then(function () { notice("已新增目（草稿）。", "ok"); return reload(); }).catch(function (e) { notice(errText(e), "err"); });
-          } } }),
-          el("button", { cls: "primary", text: "儲存", on: { click: function () {
-            rpc("save_section", { p: { id: s.id, no: no.value, title: ti.value, page: pg.value, vol: vol.value, body: sbody.value, explanation: sexp.value, image: s.image, image_caption: s.image_caption }, p_expected_version: s.version })
-              .then(function () { setDirty(false); notice("已儲存（草稿）。", "ok"); return reload(); }).catch(function (e) { notice(errText(e), "err"); });
-          } } }),
-          isOwner() && el("button", { cls: "danger", text: "刪除", on: { click: function () {
-            if (!confirm("刪除「" + s.title + "」？名相對應到此節的連結會改為只連到章。")) return;
-            rpc("delete_section", { p_id: s.id }).then(function () { notice("已刪除（草稿）。", "ok"); return reload(); }).catch(function (e) { notice(errText(e), "err"); });
-          } } }))));
-      tb.appendChild(more);
+      var blank = function () { return el("span", { cls: "act-blank" }); };
+      var acts = el("div", { cls: "acts" },
+        el("button", { text: "內文", on: { click: function () { more.hidden = !more.hidden; } } }),
+        !isItem ? el("button", { text: "＋目", title: "在這一節下新增目", on: { click: function () {
+          var ti2 = prompt("在「" + s.title + "」下新增目，目的標題："); if (!ti2 || !ti2.trim()) return;
+          var items = sectionsOf(c.id).filter(function (x) { return x.parent_id === s.id; });
+          var maxSort = Math.max.apply(null, [s.sort].concat(items.map(function (x) { return x.sort; })));
+          rpc("save_section", { p: { id: s.id + "-i" + Date.now().toString(36), chapter_id: c.id, parent_id: s.id, no: String(items.length + 1), title: ti2.trim(), page: "", vol: s.vol == null ? "" : String(s.vol), sort: String(maxSort + 1) }, p_expected_version: 0 })
+            .then(function () { notice("已新增目（草稿）。", "ok"); return reload(); }).catch(function (e) { notice(errText(e), "err"); });
+        } } }) : blank(),
+        el("button", { cls: "primary", text: "儲存", on: { click: function () {
+          rpc("save_section", { p: { id: s.id, no: no.value, title: ti.value, page: pg.value, vol: vol.value, body: sbody.value, explanation: sexp.value, image: s.image, image_caption: s.image_caption }, p_expected_version: s.version })
+            .then(function () { setDirty(false); notice("已儲存（草稿）。", "ok"); return reload(); }).catch(function (e) { notice(errText(e), "err"); });
+        } } }),
+        isOwner() ? el("button", { cls: "danger", text: "刪除", on: { click: function () {
+          if (!confirm("刪除「" + s.title + "」？" + (isItem ? "" : "其下的目會一併刪除，") + "名相對應到此處的連結會改為只連到章。")) return;
+          rpc("delete_section", { p_id: s.id }).then(function () { notice("已刪除（草稿）。", "ok"); return reload(); }).catch(function (e) { notice(errText(e), "err"); });
+        } } }) : blank());
+      // 節：編號在第一欄、標題跨兩欄；目：編號往右一格，一眼看出層級
+      var row = isItem
+        ? el("tr", { cls: "row-item" }, el("td", { cls: "c-sec" }, el("span", { cls: "muted small", text: "└" })), el("td", { cls: "c-item" }, no), el("td", {}, ti), el("td", { cls: "c-pg" }, pg), el("td", { cls: "c-vol" }, vol), el("td", { cls: "c-acts" }, acts))
+        : el("tr", { cls: "row-sec" }, el("td", { cls: "c-sec" }, no), el("td", { colspan: 2 }, ti), el("td", { cls: "c-pg" }, pg), el("td", { cls: "c-vol" }, vol), el("td", { cls: "c-acts" }, acts));
+      tb.appendChild(row); tb.appendChild(more);
     });
     right.appendChild(el("h3", { text: "節與目" }));
-    right.appendChild(el("table", {}, el("thead", {}, el("tr", {}, el("th", { text: "編號" }), el("th", { text: "標題" }), el("th", { text: "頁碼" }), el("th", { text: "輯" }), el("th"))), tb));
+    right.appendChild(el("table", { cls: "sec-table" }, el("thead", {}, el("tr", {}, el("th", { text: "節" }), el("th", { text: "目" }), el("th", { text: "標題" }), el("th", { text: "頁碼" }), el("th", { text: "輯" }), el("th"))), tb));
     right.appendChild(el("button", { style: "margin-top:8px", text: "＋ 新增節", on: { click: function () {
       var ti = prompt("新節標題："); if (!ti) return;
       var id = c.id.replace(/^c0?/, "") + "-n" + Date.now().toString(36);

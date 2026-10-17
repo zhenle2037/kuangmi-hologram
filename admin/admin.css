@@ -46,7 +46,7 @@ main{padding:12px 20px 60px}
 .zone h3{margin:.2em 0 .5em;font-size:16px}
 .beads{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px}
 .bead{border:1px solid var(--line);border-radius:8px;background:#fff;padding:6px 8px;text-align:left;min-height:54px;display:flex;flex-direction:column;align-items:flex-start}
-.bead small{color:var(--mut)}.bead.empty{background:#faf7f1;color:var(--mut)}.bead.spacer{background:#f6e3e3;border-color:#e4b9b9}
+.bead small{color:var(--mut)}.bead.empty{background:#faf7f1;color:var(--mut)}.bead.spacer{background:#e4dac8;border-color:#c4b393;color:#3b3226}.bead.spacer small{color:#6b5d48}
 table{width:100%;border-collapse:collapse;font-size:14px}
 th,td{border-bottom:1px solid var(--line);padding:6px 6px;text-align:left;vertical-align:top}
 th{font-size:13px;color:var(--mut);font-weight:400}
@@ -55,3 +55,16 @@ th{font-size:13px;color:var(--mut);font-weight:400}
 .badge{display:inline-block;font-size:12px;padding:0 6px;border-radius:4px;border:1px solid currentColor}
 .login{max-width:420px;margin:40px auto}
 .login button{width:100%;margin:.4em 0}
+.bead.empty span{color:#a2958a}.bead.empty:hover span{color:var(--acc)}
+.bead.has{cursor:grab;touch-action:pan-y;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+.bead.dragging{opacity:.35}
+.bead.ghost{position:fixed;left:0;top:0;z-index:50;pointer-events:none;box-shadow:0 10px 26px rgba(60,40,20,.28);transform-origin:center;opacity:.95;cursor:grabbing}
+.bead.drop-ok{outline:2px dashed var(--ok);outline-offset:2px}
+.bead.drop-no{outline:2px dashed var(--acc);outline-offset:2px;opacity:.6}
+body.is-dragging{cursor:grabbing;user-select:none}
+.sec-table .c-sec{width:64px}.sec-table .c-item{width:64px}.sec-table .c-pg{width:110px}.sec-table .c-vol{width:72px}
+.sec-table .c-acts{width:300px}
+.sec-table tr.row-item td{background:#fbf8f2}
+.acts{display:grid;grid-template-columns:repeat(4,68px);gap:4px;justify-content:end}
+.acts button{padding:4px 0;width:100%}
+.act-blank{display:block}
