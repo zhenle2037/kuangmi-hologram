@@ -73,6 +73,7 @@
     var b = BEADS[bn];
     if (mode === "book") return b.ch ? "chapter:" + b.ch : null;
     if (b.spacer) return "spacer:" + b.z;
+    if (mode === "mala" && !b.term && !document.body.classList.contains("reading")) return null; // 以數珠為喻：待配置的空白珠不可點
     // 珠內閱讀時點相鄰的空白珠：依點的方向，直接跳到下一段（或上一段）有內容的珠
     if (!b.term && sel && sel.k === "bead" && document.body.classList.contains("reading")) {
       var fwd = ((bn - sel.n + 108) % 108) < 54;
@@ -229,7 +230,6 @@
         h = zoneHead(z2) + "<h2>" + z2.spacerName + "：" + esc(z2.spacerTitle) + "</h2>" +
           '<p class="pos">環上編號 ' + z2.spacerNo + "／108 ・ 引領其後 26 顆普通數珠（" + z2.first + "–" + z2.last + "）</p>";
         h += "<h3>原文的隔珠譬喻 " + tag("quote") + '</h3><div class="box">以風瑜伽為隔珠</div>';
-        h += '<div class="notice">引文原本只說「以風瑜伽為隔珠」。將四顆隔珠分別設為「見、修、行、果」，是本網站的導覽安排，並非引文本身的說法。' + (sel.z === 1 ? "（第二隔珠標示「修（風瑜伽）」，與原文的風瑜伽相呼應。）" : "") + "</div>";
         if (z2.spacerBody) h += "<h3>原書正文 " + tag("book") + '</h3><div class="prose">' + esc(z2.spacerBody) + "</div>";
         if (z2.spacerExplanation) h += "<h3>整理說明 " + tag("nav") + '</h3><div class="prose">' + esc(z2.spacerExplanation) + "</div>";
         if (z2.spacerImage && /^(https:\/\/|assets\/)/.test(z2.spacerImage)) h += '<figure class="fig"><img src="' + esc(z2.spacerImage) + '" alt="' + esc(z2.spacerImageCaption || "") + '" loading="lazy"><figcaption>' + esc(z2.spacerImageCaption || "") + "</figcaption></figure>";
@@ -388,8 +388,8 @@
     var lab = $("#chsel-lab"), h;
     if (mode === "mala") {
       lab.textContent = "部件";
-      h = '<option value="">— 選擇部件 —</option>' + PART_KEYS.map(function (k) { return '<option value="part:' + k + '">' + esc(D.parts[k].title) + "</option>"; }).join("") +
-        '<optgroup label="四顆隔珠">' + D.zones.map(function (zn) { return '<option value="spacer:' + zn.idx + '">隔珠・' + esc(zn.name) + "</option>"; }).join("") + "</optgroup>";
+      h = '<option value="">— 選擇部件 —</option>' + PART_KEYS.filter(function (k) { return k !== "spacer"; }).map(function (k) { return '<option value="part:' + k + '">' + esc(D.parts[k].title) + "</option>"; }).join("") +
+        '<optgroup label="四隔珠">' + D.zones.map(function (zn) { return '<option value="spacer:' + zn.idx + '">隔珠・' + esc(zn.name) + "</option>"; }).join("") + "</optgroup>";
     } else if (mode === "terms") {
       lab.textContent = "四區";
       h = '<option value="">— 選擇區或名相 —</option>' + D.zones.map(function (zn) {

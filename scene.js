@@ -522,6 +522,7 @@
 
   /* ---------- 選取 → 轉動與飛近 ---------- */
   var FOCUS_KINDS = { bead: 1, empty: 1, spacer: 1, zone: 1, chapter: 1, sec: 1 };
+  var PART_AT = { bead: 34, spacer: 54, string: 66.5 }; // 與部件標籤的錨點一致
   function focusBead(s) {
     if (!s) return 0;
     if (s.k === "bead" || s.k === "empty") return s.n;
@@ -534,6 +535,7 @@
     if (!built) return;
     var prev = selected, wasReading = reading; selected = sel;
     focused = !!sel && (FOCUS_KINDS[sel.k] || (sel.k === "part" && (sel.id === "head" || sel.id === "tassel")));
+    var partN = sel && sel.k === "part" ? PART_AT[sel.id] : null; // 部件聚焦的位置（數珠、隔珠、串繩；佛頭與飾穗另行處理）
     reading = !!sel && (sel.k === "bead" || sel.k === "empty" || sel.k === "chapter" || sel.k === "sec");
     applyTargets();
     var RS_ = 1.33; // 閱讀時被點的珠放大（相鄰珠仍不重疊）
@@ -545,6 +547,7 @@
     else if (sel && sel.k === "zone" && labelSet === "terms") { var zr = zoneSpan(sel.z); rotTo = -(zr[0] + zr[1]) / 2; } // 有內容的珠段置中
     else if (sel && sel.k === "zone") rotTo = -(ANG[D.zones[sel.z].first] + ANG[D.zones[sel.z].last]) / 2;
     else if (sel && sel.k === "part" && (sel.id === "head" || sel.id === "tassel")) rotTo = 0;
+    else if (partN != null) rotTo = -angOf(partN);
     if (fb && reading) { // 鏡頭正對被點的珠，使它在畫面中放大到可容納文字的大小
       var availW = W - (narrow ? 0 : 2 * offX), Dpx = narrow ? Math.min(W * 0.92, H * 0.86) : Math.min(H * 0.72, availW * 0.56);
       var dist = RAD[fb] * RS_ * H / (Math.tan(FOV * Math.PI / 360) * Dpx);
@@ -557,15 +560,17 @@
       camTo = new T.Vector3(0, dz * Math.sin(tilt), R - sag * 0.4 + dz * Math.cos(tilt)); tgtTo = new T.Vector3(0, 0, R - sag * 0.4);
     }
     else if (sel && sel.k === "zone") { camTo = new T.Vector3(0, 16 * f, R + 28 * f); tgtTo = new T.Vector3(0, 0, R - 5); }
-    else if (sel && sel.k === "part" && (sel.id === "head" || sel.id === "tassel")) { camTo = new T.Vector3(6, 3.5, R + 13); tgtTo = new T.Vector3(0, -1.2, R + 1.4); }
+    else if (sel && sel.k === "part" && (sel.id === "head" || sel.id === "tassel")) { camTo = new T.Vector3(8, 9, R + 24); tgtTo = new T.Vector3(0, 0.5, R); } // 拉近但保留部件標題與說明在畫面內
+    else if (partN != null) { camTo = new T.Vector3(0, 9, R + 24); tgtTo = new T.Vector3(0, 0, R); }
     else { camTo = overviewPos(); tgtTo = new T.Vector3(0, 0, 0); }
     G.killTweensOf(camera.position); G.killTweensOf(controls.target); if (rotTween) rotTween.kill();
     controls.enabled = false;
     if (rotTo != null) rotTween = G.to(malaGroup.rotation, { y: wrapNear(rotTo, malaGroup.rotation.y), duration: dur, ease: "power3.inOut" });
     G.to(controls.target, { x: tgtTo.x, y: tgtTo.y, z: tgtTo.z, duration: dur, ease: "power3.inOut" });
     G.to(camera.position, { x: camTo.x, y: camTo.y, z: camTo.z, duration: dur, ease: "power3.inOut", onComplete: function () { controls.enabled = true; } });
-    quoteEl.classList.toggle("hide", !!focused && !narrow); bookStele.classList.toggle("hide", !!focused && !narrow);
-    labelsBox.classList.toggle("hide", !!focused && !(labelSet === "terms" && sel && sel.k === "zone"));
+    var partSel = !!(sel && sel.k === "part");
+    quoteEl.classList.toggle("hide", (!!focused || partSel) && !narrow); bookStele.classList.toggle("hide", !!focused && !narrow);
+    labelsBox.classList.toggle("hide", !!focused && !partSel && !(labelSet === "terms" && sel && sel.k === "zone")); // 部件聚焦時仍顯示部件標題與說明
     syncHulls();
     if (labelSet === "terms" && sel && sel.k === "zone") { var z3 = D.zones[sel.z], own = D.terms.filter(function (t) { return t.group === z3.group; }).length; calloutEl.innerHTML = "<b>" + KM.esc(z3.name) + "　區</b><small>數珠 " + z3.first + "–" + z3.last + " ・ " + z3.spacerName + " " + z3.spacerNo + " ・ 已配置 " + own + "／26 ・ 點名相進入該珠</small>"; calloutEl.classList.add("on", "zonehead"); } else calloutEl.classList.remove("zonehead");
     buildFocusUI();
@@ -653,10 +658,11 @@
     var o = toScreen(tmp.set(0, 0, 0)), ctr = { x: o.x, y: o.y };
     var zoneView = labelSet === "terms" && selected && selected.k === "zone";
     if (zoneView) layoutZone(selected.z);
-    else if (!focused) {
+    else if (!focused || (selected && selected.k === "part")) { // 部件聚焦時標題持續跟著念珠位置
       labelDefs.forEach(function (d) {
         if (d.set !== labelSet) { d.el.style.display = "none"; d.path.style.display = "none"; return; }
         d.el.style.display = "";
+        var ps = selected && selected.k === "part" ? "part:" + selected.id : null; d.el.classList.toggle("dim", !!ps && d.act !== ps); d.el.classList.toggle("on", !!ps && d.act === ps); // 聚焦部件時，其他標題變淡
         d.anchor(tmp); var a = toScreen(tmp), pa = a; // pa：引線起點（飾穗的引線指向垂下的流蘇，標籤位置則以佛頭為準，免得被擠進念珠上）
         if (d.id === "tassel") { guru.getWorldPosition(tmp); a = toScreen(tmp); }
         var dx = a.x - ctr.x, dy = a.y - ctr.y, m = Math.hypot(dx, dy) || 1; dx /= m; dy /= m;
@@ -694,7 +700,7 @@
         it.el.style.transform = "translate(" + x.toFixed(1) + "px," + y.toFixed(1) + "px) translate(0,-50%)";
         it.path.setAttribute("d", "M" + (x - 4) + " " + y + " C" + (x - 70) + " " + y + " " + (cx - 30 + i * 8) + " " + (cy + 50) + " " + cx + " " + (cy + 16));
       });
-      if (!narrow) {
+      if (!narrow && labelSet !== "parts") { // 以數珠為喻頁不畫連到右側面板的虛線
         var pr = document.getElementById("panel").getBoundingClientRect(), sr = stage.getBoundingClientRect();
         var px = pr.left - sr.left, py = pr.top - sr.top + 64;
         mainLeader.setAttribute("d", "M" + (cx + 16) + " " + cy + " C" + (cx + 90) + " " + cy + " " + (px - 90) + " " + py + " " + px + " " + py);
@@ -756,7 +762,7 @@
     requestAnimationFrame(loop);
     var raw = clock.getDelta(), dt = Math.min(0.05, raw);
     if (!paused && !reduce) { tt += dt; galaxyGroup.rotation.y += dt * 0.02; baseGroup.rotation.y -= dt * 0.05; }
-    var idle = !focused && !paused && !reduce && !hover && !userDrag && !(labelSet === "terms" && selected && selected.k === "zone"); // 名相頁總覽照常轉動；進入某區時停住，讓名相穩定好讀
+    var idle = !focused && !paused && !reduce && !hover && !userDrag && !(selected && selected.k === "part") && !(labelSet === "terms" && selected && selected.k === "zone"); // 名相頁總覽照常轉動；進入某區時停住，讓名相穩定好讀
     spinV += ((idle ? 0.07 : 0) - spinV) * Math.min(1, dt * 2.5); if (paused || reduce) spinV = 0;
     if (!(rotTween && rotTween.isActive())) malaGroup.rotation.y -= spinV * dt;
     bobAmp += ((focused ? 0 : 1) - bobAmp) * Math.min(1, dt * 3);
